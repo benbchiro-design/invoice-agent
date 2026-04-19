@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invoice agent</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f9f9f7;--surface:#fff;
+  --border:rgba(0,0,0,0.1);--border-strong:rgba(0,0,0,0.18);
+  --text:#1a1a18;--text-secondary:#6b6b66;--text-hint:#9c9a94;
+  --blue:#185FA5;--blue-bg:#E6F1FB;--blue-text:#0C447C;
+  --green:#0F6E56;--green-bg:#E1F5EE;--green-text:#085041;
+  --amber:#854F0B;--amber-bg:#FAEEDA;--amber-text:#633806;
+  --red:#A32D2D;--red-bg:#FCEBEB;--red-text:#791F1F;
+  --gray-bg:#F1EFE8;--gray-text:#5F5E5A;
+  --purple-bg:#EEEDFE;--purple-text:#3C3489;
+  --r:10px;--rs:6px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:2rem 1rem;font-size:15px;line-height:1.5}
+.page{max-width:800px;margin:0 auto;position:relative}
+h1{font-size:20px;font-weight:600}
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.5rem;gap:12px}
+.subtitle{font-size:13px;color:var(--text-secondary);margin-top:3px}
+.config-bar{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:12px 16px;margin-bottom:1.5rem;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.config-bar label{font-size:13px;color:var(--text-secondary);white-space:nowrap}
+.config-bar input{padding:6px 10px;border:0.5px solid var(--border-strong);border-radius:var(--rs);font-size:13px;background:var(--bg);color:var(--text)}
+.config-bar input:focus{outline:none;border-color:var(--blue)}
+.summary-bar{display:flex;gap:10px;margin-bottom:1.5rem;flex-wrap:wrap}
+.scard{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--rs);padding:10px 16px;flex:1;min-width:110px}
+.scard .sl{font-size:12px;color:var(--text-secondary);margin-bottom:3px}
+.scard .sv{font-size:20px;font-weight:500}
+.tabs{display:flex;margin-bottom:1.5rem;border-bottom:0.5px solid var(--border);overflow-x:auto}
+.tab{padding:8px 16px;font-size:14px;cursor:pointer;color:var(--text-secondary);border:none;border-bottom:2px solid transparent;background:none;transition:all .15s;white-space:nowrap}
+.tab.active{color:var(--text);border-bottom-color:var(--text);font-weight:500}
+.tc{display:inline-block;font-size:11px;padding:1px 6px;border-radius:10px;margin-left:4px}
+.tc-blue{background:var(--blue-bg);color:var(--blue-text)}
+.tc-amber{background:var(--amber-bg);color:var(--amber-text)}
+.tc-purple{background:var(--purple-bg);color:var(--purple-text)}
+.tc-green{background:var(--green-bg);color:var(--green-text)}
+.badge{font-size:12px;font-weight:500;padding:3px 9px;border-radius:20px;white-space:nowrap}
+.b-checkin{background:var(--blue-bg);color:var(--blue-text)}
+.b-approval{background:var(--amber-bg);color:var(--amber-text)}
+.b-eft{background:var(--purple-bg);color:var(--purple-text)}
+.b-done{background:var(--green-bg);color:var(--green-text)}
+.card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden;transition:opacity .3s}
+.card.fading{opacity:0}
+.card-header{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:0.5px solid var(--border);flex-wrap:wrap}
+.avatar{width:36px;height:36px;min-width:36px;border-radius:50%;background:var(--blue-bg);color:var(--blue-text);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600}
+.pname{font-weight:500;font-size:14px}
+.pmeta{font-size:12px;color:var(--text-secondary);margin-top:1px}
+.card-header .badge{margin-left:auto}
+.card-body{padding:14px 16px}
+.checkin-q{font-size:14px;font-weight:500;margin-bottom:12px}
+.pay-opts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.pay-opt{padding:10px 18px;border:0.5px solid var(--border-strong);border-radius:var(--rs);background:var(--bg);color:var(--text);font-size:14px;cursor:pointer;transition:all .15s}
+.pay-opt:hover,.pay-opt.sel{border-color:var(--blue);background:var(--blue-bg);color:var(--blue-text);font-weight:500}
+.method-opts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.method-opt{padding:8px 14px;border:0.5px solid var(--border-strong);border-radius:var(--rs);background:var(--bg);color:var(--text);font-size:13px;cursor:pointer;transition:all .15s}
+.method-opt:hover,.method-opt.sel{border-color:var(--blue);background:var(--blue-bg);color:var(--blue-text);font-weight:500}
+.field-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.field-row label{font-size:13px;color:var(--text-secondary);white-space:nowrap;min-width:90px}
+.field-input{padding:7px 10px;border:0.5px solid var(--border-strong);border-radius:var(--rs);font-size:14px;background:var(--bg);color:var(--text);width:150px}
+.field-input:focus{outline:none;border-color:var(--blue)}
+.hint{font-size:12px;color:var(--text-hint)}
+.info-box{border-radius:var(--rs);padding:10px 14px;font-size:13px;margin-bottom:14px;border:0.5px solid var(--border)}
+.info-eft{background:var(--purple-bg);color:var(--purple-text)}
+.info-nocharge{background:var(--gray-bg);color:var(--gray-text)}
+.info-paid{background:var(--green-bg);color:var(--green-text)}
+.section-label{font-size:12px;font-weight:500;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
+.line-items{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px;table-layout:fixed}
+.line-items th{text-align:left;font-weight:500;color:var(--text-secondary);padding:5px 6px;border-bottom:0.5px solid var(--border);font-size:12px}
+.line-items td{padding:7px 6px;border-bottom:0.5px solid var(--border);vertical-align:middle}
+.line-items tr:last-child td{border-bottom:none}
+.line-items input{width:100%;padding:4px 5px;border:0.5px solid transparent;border-radius:4px;font-size:13px;background:transparent;color:var(--text)}
+.line-items input:focus{outline:none;border-color:var(--blue);background:var(--blue-bg)}
+.col-code{width:80px}.col-qty{width:44px}.col-rate{width:86px}.col-amt{width:86px}.col-del{width:28px;text-align:center}
+.del-btn{background:none;border:none;cursor:pointer;color:var(--text-hint);font-size:16px;padding:0;line-height:1}
+.del-btn:hover{color:var(--red)}
+.add-line{font-size:12px;padding:4px 10px;border:0.5px dashed var(--border-strong);border-radius:var(--rs);background:transparent;color:var(--text-secondary);cursor:pointer;margin-bottom:12px}
+.add-line:hover{background:var(--bg);color:var(--text)}
+.totals-row{display:flex;justify-content:flex-end;gap:20px;font-size:13px;color:var(--text-secondary);padding-bottom:12px;border-bottom:0.5px solid var(--border);margin-bottom:12px;align-items:center}
+.totals-row strong{font-size:15px;color:var(--text)}
+.icd-wrap{position:relative;display:inline-block}
+.icd-input{padding:5px 9px;border:0.5px solid var(--border-strong);border-radius:var(--rs);font-size:13px;background:var(--bg);color:var(--text);width:150px}
+.icd-input:focus{outline:none;border-color:var(--blue)}
+.icd-dropdown{position:absolute;top:calc(100% + 4px);left:0;background:var(--surface);border:0.5px solid var(--border-strong);border-radius:var(--rs);z-index:200;width:400px;max-height:260px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.1)}
+.icd-section{font-size:11px;font-weight:500;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;padding:7px 12px 3px;background:var(--bg);position:sticky;top:0;border-bottom:0.5px solid var(--border)}
+.icd-option{display:flex;gap:10px;align-items:baseline;padding:8px 12px;cursor:pointer;border-bottom:0.5px solid var(--border);transition:background .1s}
+.icd-option:hover{background:var(--blue-bg)}
+.icd-option:last-child{border-bottom:none}
+.icd-opt-code{font-size:12px;font-weight:500;color:var(--blue-text);min-width:60px;font-family:monospace}
+.icd-opt-desc{font-size:13px;color:var(--text);flex:1;line-height:1.3}
+.icd-empty-msg{padding:1rem 12px;font-size:13px;color:var(--text-secondary);text-align:center}
+.icd-warning{background:var(--amber-bg);border:0.5px solid var(--border);border-radius:var(--rs);padding:8px 12px;font-size:12px;color:var(--amber-text);margin-top:6px;display:none}
+.ai-row{display:flex;gap:8px;margin-bottom:12px}
+.ai-input{flex:1;padding:7px 10px;border:0.5px solid var(--border-strong);border-radius:var(--rs);font-size:13px;background:var(--bg);color:var(--text)}
+.ai-input:focus{outline:none;border-color:var(--blue)}
+.ai-btn{padding:7px 14px;font-size:13px;border:0.5px solid var(--blue);border-radius:var(--rs);background:var(--blue-bg);color:var(--blue-text);cursor:pointer;font-weight:500;white-space:nowrap}
+.ai-btn:hover{background:#cde3f5}
+.ai-btn:disabled{opacity:.4;cursor:not-allowed}
+.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn-green{padding:8px 20px;font-size:14px;font-weight:500;border:none;border-radius:var(--rs);background:var(--green);color:#fff;cursor:pointer}
+.btn-green:hover{background:#0a5c47}
+.btn-green:disabled{opacity:.4;cursor:not-allowed}
+.btn-blue{padding:8px 20px;font-size:14px;font-weight:500;border:none;border-radius:var(--rs);background:var(--blue);color:#fff;cursor:pointer}
+.btn-blue:hover{background:#134f8c}
+.btn-blue:disabled{opacity:.4;cursor:not-allowed}
+.btn-ghost{padding:8px 16px;font-size:14px;border:0.5px solid var(--border-strong);border-radius:var(--rs);background:transparent;color:var(--text-secondary);cursor:pointer}
+.btn-ghost:hover{background:var(--bg)}
+.smsg{font-size:12px;padding:5px 10px;border-radius:var(--rs);margin-left:auto}
+.smsg-ok{background:var(--green-bg);color:var(--green-text)}
+.smsg-err{background:var(--red-bg);color:var(--red-text)}
+.empty{text-align:center;padding:3rem 1rem;color:var(--text-secondary);font-size:14px}
+.loading{display:flex;align-items:center;justify-content:center;gap:8px;padding:2rem;color:var(--text-secondary);font-size:14px}
+.spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.refresh-btn{padding:7px 14px;font-size:13px;border:0.5px solid var(--border-strong);border-radius:var(--rs);background:var(--surface);color:var(--text);cursor:pointer}
+.refresh-btn:hover{background:var(--bg)}
+.refresh-btn:disabled{opacity:.4;cursor:not-allowed}
+.lookup-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.18);z-index:100;display:flex;align-items:flex-start;justify-content:center;padding-top:60px}
+.lookup-box{background:var(--surface);border:0.5px solid var(--border-strong);border-radius:var(--r);width:100%;max-width:540px;max-height:420px;display:flex;flex-direction:column;overflow:hidden}
+.lookup-header{padding:12px 14px;border-bottom:0.5px solid var(--border);display:flex;gap:10px;align-items:center}
+.lookup-search{flex:1;padding:7px 10px;border:0.5px solid var(--border-strong);border-radius:var(--rs);font-size:14px;background:var(--bg);color:var(--text)}
+.lookup-search:focus{outline:none;border-color:var(--blue)}
+.lookup-close{background:none;border:none;cursor:pointer;font-size:18px;color:var(--text-hint);padding:0 4px;line-height:1}
+.lookup-close:hover{color:var(--text)}
+.lookup-results{overflow-y:auto;flex:1}
+.lookup-section{font-size:11px;font-weight:500;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;padding:8px 14px 4px;background:var(--bg);position:sticky;top:0;border-bottom:0.5px solid var(--border)}
+.lookup-row{display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:0.5px solid var(--border);transition:background .1s}
+.lookup-row:hover{background:var(--blue-bg)}
+.lookup-code{font-size:12px;font-weight:500;color:var(--blue-text);min-width:52px;font-family:monospace}
+.lookup-desc{font-size:13px;color:var(--text);flex:1}
+.lookup-rate{font-size:13px;color:var(--text-secondary);white-space:nowrap}
+.lookup-empty{padding:2rem;text-align:center;font-size:13px;color:var(--text-secondary)}
+/* Chat */
+.chat-fab{position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;background:#1a1a18;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:1000;box-shadow:0 4px 16px rgba(0,0,0,.2)}
+.chat-fab svg{width:22px;height:22px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.chat-panel{position:fixed;bottom:88px;right:24px;width:380px;background:var(--surface);border:0.5px solid var(--border-strong);border-radius:var(--r);box-shadow:0 8px 32px rgba(0,0,0,.12);z-index:1000;display:none;flex-direction:column;overflow:hidden;max-height:520px}
+.chat-panel.open{display:flex}
+.chat-header{padding:12px 16px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.chat-title{font-size:14px;font-weight:500;color:var(--text)}
+.chat-close-btn{background:none;border:none;cursor:pointer;font-size:18px;color:var(--text-hint);line-height:1;padding:0}
+.chat-close-btn:hover{color:var(--text)}
+.chat-messages{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;min-height:200px}
+.cmsg{max-width:88%;font-size:13px;line-height:1.5;padding:9px 12px;border-radius:var(--r)}
+.cmsg-ai{background:var(--bg);color:var(--text);align-self:flex-start;border:0.5px solid var(--border)}
+.cmsg-user{background:#1a1a18;color:#fff;align-self:flex-end}
+.cmsg-ai table{width:100%;border-collapse:collapse;margin-top:6px;font-size:12px}
+.cmsg-ai th{text-align:left;padding:4px 6px;border-bottom:0.5px solid var(--border);color:var(--text-secondary);font-weight:500}
+.cmsg-ai td{padding:4px 6px;border-bottom:0.5px solid var(--border)}
+.cmsg-ai tr:last-child td{border-bottom:none}
+.chat-input-row{padding:10px 12px;border-top:0.5px solid var(--border);display:flex;gap:8px}
+.chat-input{flex:1;padding:8px 10px;border:0.5px solid var(--border-strong);border-radius:var(--rs);font-size:13px;background:var(--bg);color:var(--text)}
+.chat-input:focus{outline:none;border-color:#1a1a18}
+.chat-send-btn{padding:8px 14px;background:#1a1a18;color:#fff;border:none;border-radius:var(--rs);font-size:13px;cursor:pointer;white-space:nowrap}
+.chat-send-btn:hover{background:#333}
+.chat-send-btn:disabled{opacity:.4;cursor:not-allowed}
+.chat-chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 10px}
+.chat-chip{font-size:12px;padding:4px 10px;border:0.5px solid var(--border-strong);border-radius:20px;background:transparent;color:var(--text-secondary);cursor:pointer}
+.chat-chip:hover{background:var(--bg);color:var(--text)}
+.cdot{width:6px;height:6px;border-radius:50%;background:var(--text-secondary);animation:cblink 1s infinite;display:inline-block;margin:0 2px}
+.cdot:nth-child(2){animation-delay:.2s}
+.cdot:nth-child(3){animation-delay:.4s}
+@keyframes cblink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-header">
+    <div><h1>Invoice agent</h1><div class="subtitle" id="date-label"></div></div>
+    <button class="refresh-btn" id="refresh-btn" onclick="loadAll()">Refresh</button>
+  </div>
+  <div class="config-bar">
+    <label>Default ICD-10</label>
+    <input type="text" id="default-icd" value="M99.11" style="width:100px" oninput="saveConfig()">
+    <label>Wix API Key</label>
+    <input type="password" id="wix-api-key" placeholder="Paste Wix Admin API key" style="width:220px" oninput="WIX_API_KEY=this.value;saveConfig()">
+    <label>Site ID</label>
+    <input type="text" id="wix-site-id" placeholder="Wix Site ID" style="width:180px" oninput="WIX_SITE_ID=this.value;saveConfig()">
+    <label>Anthropic Key</label>
+    <input type="password" id="anthropic-key" placeholder="sk-ant-..." style="width:180px" oninput="ANTHROPIC_KEY=this.value;saveConfig()">
+  </div>
+  <div class="summary-bar">
+    <div class="scard"><div class="sl">Check-in needed</div><div class="sv" id="s-checkin">0</div></div>
+    <div class="scard"><div class="sl">Pending approval</div><div class="sv" id="s-approval">0</div></div>
+    <div class="scard"><div class="sl">Outstanding EFT</div><div class="sv" id="s-eft">0</div></div>
+    <div class="scard"><div class="sl">Sent today</div><div class="sv" id="s-done">0</div></div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" id="tab-btn-checkin" onclick="switchTab('checkin',this)">Check-in <span class="tc tc-blue" id="tc-checkin">0</span></button>
+    <button class="tab" id="tab-btn-approval" onclick="switchTab('approval',this)">Approval queue <span class="tc tc-amber" id="tc-approval">0</span></button>
+    <button class="tab" id="tab-btn-eft" onclick="switchTab('eft',this)">Outstanding EFT <span class="tc tc-purple" id="tc-eft">0</span></button>
+    <button class="tab" id="tab-btn-done" onclick="switchTab('done',this)">Done <span class="tc tc-green" id="tc-done">0</span></button>
+  </div>
+  <div id="panel-checkin"></div>
+  <div id="panel-approval" style="display:none"></div>
+  <div id="panel-eft" style="display:none"></div>
+  <div id="panel-done" style="display:none"></div>
+</div>
+
+<!-- Chat -->
+<button class="chat-fab" onclick="toggleChat()" title="Ask anything">
+  <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+</button>
+<div class="chat-panel" id="chat-panel">
+  <div class="chat-header">
+    <span class="chat-title">Ask anything</span>
+    <button class="chat-close-btn" onclick="toggleChat()">x</button>
+  </div>
+  <div class="chat-messages" id="chat-messages">
+    <div class="cmsg cmsg-ai">Hi Ben! Ask me about your bookings or invoices. Try: "show last week bookings" or "which invoices are unpaid?"</div>
+  </div>
+  <div class="chat-chips" id="chat-chips">
+    <button class="chat-chip" onclick="askChat('Show last week bookings')">Last week</button>
+    <button class="chat-chip" onclick="askChat('Which invoices are unpaid?')">Unpaid invoices</button>
+    <button class="chat-chip" onclick="askChat('Monthly invoice total')">Monthly total</button>
+    <button class="chat-chip" onclick="askChat('Patients seen this week')">This week</button>
+  </div>
+  <div class="chat-input-row">
+    <input class="chat-input" id="chat-input" placeholder="Ask about bookings or invoices...">
+    <button class="chat-send-btn" id="chat-send" onclick="sendChat()">Send</button>
+  </div>
+</div>
+
+<script>
+// ── CONFIG — paste your keys here ──────────────────────────────
+var ANTHROPIC_KEY = '';  // paste your Anthropic API key (sk-ant-...)
+var WIX_API_KEY   = '';  // paste your Wix Admin API key
+var WIX_SITE_ID   = '';  // paste your Wix Site ID
+// ───────────────────────────────────────────────────────────────
+
+var CLAUDE_API = 'https://api.anthropic.com/v1/messages';
+
+function getClaudeApi(){ return CLAUDE_API; }
+var records = [];
+
+var fmtZar = function(n){ return 'R' + Number(n||0).toLocaleString('en-ZA',{minimumFractionDigits:2,maximumFractionDigits:2}); };
+var fmtDate = function(iso){ return iso ? new Date(iso).toLocaleString('en-ZA',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '-'; };
+var initials = function(name){ return (name||'').split(' ').map(function(p){return p[0]||'';}).join('').toUpperCase().slice(0,2); };
+var defaultIcd = function(){ return document.getElementById('default-icd').value.trim()||'M99.11'; };
+var backendUrl = function(){ return ''; }; // not used in standalone mode
+var calcTotal = function(items){ return items.reduce(function(s,i){return s+(parseFloat(i.qty||1)*parseFloat(i.rate||0));},0); };
+
+var PRACTICE = {
+  name:'Ben Bradford Chiropractic', qual:'M Tech Chiropractic (DUT)',
+  practiceNo:'9990040001075152', address:'8 Windhover Street, Cape Town, Western Cape 7945, South Africa',
+  phone:'+27 83 229 2057', email:'benbchiro@gmail.com', website:'bencairo.com'
+};
+
+function isRealBackend(){
+  return WIX_API_KEY && WIX_API_KEY.length > 10 && WIX_SITE_ID && WIX_SITE_ID.length > 10;
+}
+
+function switchTab(name, btn){
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+  btn.classList.add('active');
+  ['checkin','approval','eft','done'].forEach(function(n){
+    document.getElementById('panel-'+n).style.display = n===name ? 'block' : 'none';
+  });
+  if(name==='approval') setTimeout(function(){records.filter(function(r){return r.stage==='approval';}).forEach(function(r){initTbody(r.id);});},60);
+}
+
+function updateCounts(){
+  ['checkin','approval','eft','done'].forEach(function(s){
+    var n = records.filter(function(r){return r.stage===s;}).length;
+    document.getElementById('s-'+s).textContent = n;
+    document.getElementById('tc-'+s).textContent = n;
+  });
+}
+
+function renderAll(){
+  ['checkin','approval','eft','done'].forEach(function(stage){
+    var panel = document.getElementById('panel-'+stage);
+    var recs = records.filter(function(r){return r.stage===stage;});
+    var msgs = {checkin:'No appointments needing check-in.',approval:'No invoices waiting for approval.',eft:'No outstanding EFT invoices.',done:'Nothing sent yet today.'};
+    if(!recs.length){ panel.innerHTML = '<div class="empty">'+msgs[stage]+'</div>'; return; }
+    panel.innerHTML = '';
+    recs.forEach(function(r){ panel.appendChild(makeCard(r)); });
+  });
+  updateCounts();
+  setTimeout(function(){records.filter(function(r){return r.stage==='approval';}).forEach(function(r){initTbody(r.id);});},60);
+}
+
+function makeCard(rec){
+  var bm = {checkin:'b-checkin',approval:'b-approval',eft:'b-eft',done:'b-done'};
+  var bl = {checkin:'Check-in',approval:'Pending approval',eft:'EFT pending',done:'Sent'};
+  var div = document.createElement('div');
+  div.className = 'card'; div.id = 'card-'+rec.id;
+  div.innerHTML = '<div class="card-header">'
+    +'<div class="avatar">'+initials(rec.patientName)+'</div>'
+    +'<div><div class="pname">'+rec.patientName+'</div>'
+    +'<div class="pmeta">'+fmtDate(rec.appointmentTime)+' &nbsp;&middot;&nbsp; '+rec.invoiceNumber+(rec.paymentMethod?' &nbsp;&middot;&nbsp; '+rec.paymentMethod:'')+'</div></div>'
+    +'<span class="badge '+bm[rec.stage]+'">'+bl[rec.stage]+'</span></div>'
+    +'<div class="card-body" id="body-'+rec.id+'">'+bodyHtml(rec)+'</div>';
+  return div;
+}
+
+function bodyHtml(rec){
+  if(rec.stage==='checkin') return checkinHtml(rec);
+  if(rec.stage==='approval') return approvalHtml(rec);
+  if(rec.stage==='eft') return eftHtml(rec);
+  return doneHtml(rec);
+}
+
+// LINE ITEMS SUMMARY (shown after payment selection in check-in)
+function lineItemsSummary(rec){
+  var rows = rec.lineItems.map(function(i){
+    return '<tr>'
+      +'<td style="padding:5px 6px;font-size:13px;color:var(--text-secondary)">'+i.code+'</td>'
+      +'<td style="padding:5px 6px;font-size:13px">'+i.description+'</td>'
+      +'<td style="padding:5px 6px;font-size:13px;text-align:right">'+fmtZar(i.qty*i.rate)+'</td>'
+      +'</tr>';
+  }).join('');
+  return '<table style="width:100%;border-collapse:collapse;margin-bottom:14px;border:0.5px solid var(--border);border-radius:var(--rs);overflow:hidden">'
+    +'<thead><tr style="background:var(--bg)">'
+    +'<th style="padding:6px;font-size:12px;font-weight:500;color:var(--text-secondary);text-align:left;border-bottom:0.5px solid var(--border)">Code</th>'
+    +'<th style="padding:6px;font-size:12px;font-weight:500;color:var(--text-secondary);text-align:left;border-bottom:0.5px solid var(--border)">Description</th>'
+    +'<th style="padding:6px;font-size:12px;font-weight:500;color:var(--text-secondary);text-align:right;border-bottom:0.5px solid var(--border)">Amount</th>'
+    +'</tr></thead><tbody>'+rows+'</tbody>'
+    +'<tfoot><tr style="border-top:0.5px solid var(--border)">'
+    +'<td colspan="2" style="padding:6px;font-size:13px;font-weight:500;text-align:right">Total</td>'
+    +'<td style="padding:6px;font-size:13px;font-weight:500;text-align:right">'+fmtZar(calcTotal(rec.lineItems))+'</td>'
+    +'</tr></tfoot></table>';
+}
+
+// CHECK-IN
+function checkinHtml(rec){
+  return '<div class="checkin-q">Has '+rec.patientName.split(' ')[0]+' paid?</div>'
+    +'<div class="pay-opts">'
+    +'<div class="pay-opt" id="opt-paid-'+rec.id+'" onclick="pickPayment(\''+rec.id+'\',\'paid\')">Yes - paid now</div>'
+    +'<div class="pay-opt" id="opt-eft-'+rec.id+'" onclick="pickPayment(\''+rec.id+'\',\'eft\')">Will EFT later</div>'
+    +'<div class="pay-opt" id="opt-nocharge-'+rec.id+'" onclick="pickPayment(\''+rec.id+'\',\'nocharge\')">No charge</div>'
+    +'</div><div id="detail-'+rec.id+'"></div>';
+}
+
+function pickPayment(id, choice){
+  var rec = records.find(function(r){return r.id===id;});
+  if(!rec) return;
+  rec.paymentChoice = choice;
+  ['paid','eft','nocharge'].forEach(function(c){
+    var el = document.getElementById('opt-'+c+'-'+id);
+    if(el) el.classList.toggle('sel', c===choice);
+  });
+  var detail = document.getElementById('detail-'+id);
+  if(!detail) return;
+  if(choice==='paid'){
+    detail.innerHTML = '<div class="checkin-q" style="margin-bottom:10px">How did they pay?</div>'
+      +'<div class="method-opts">'
+      +'<div class="method-opt" id="m-cash-'+id+'" onclick="pickMethod(\''+id+'\',\'Cash\')">Cash</div>'
+      +'<div class="method-opt" id="m-card-'+id+'" onclick="pickMethod(\''+id+'\',\'Card\')">Card</div>'
+      +'<div class="method-opt" id="m-eft-'+id+'" onclick="pickMethod(\''+id+'\',\'EFT received\')">EFT received</div>'
+      +'</div>'
+      +'<div class="field-row"><label>Amount paid</label>'
+      +'<input class="field-input" type="number" id="amount-'+id+'" value="'+calcTotal(rec.lineItems).toFixed(2)+'" step="10">'
+      +'<span class="hint">ZAR</span></div>'
+      +lineItemsSummary(rec)
+      +'<div class="actions"><button class="btn-green" onclick="toApproval(\''+id+'\')">Add to approval queue</button></div>';
+  } else if(choice==='eft'){
+    detail.innerHTML = '<div class="info-box info-eft">An unpaid invoice will be prepared for '+rec.patientEmail+'. You will review it before it goes out.</div>'
+      +'<div class="field-row"><label>Invoice amount</label>'
+      +'<input class="field-input" type="number" id="amount-'+id+'" value="'+calcTotal(rec.lineItems).toFixed(2)+'" step="10">'
+      +'<span class="hint">ZAR</span></div>'
+      +lineItemsSummary(rec)
+      +'<div class="actions"><button class="btn-blue" onclick="toApproval(\''+id+'\')">Add to approval queue</button></div>';
+  } else {
+    detail.innerHTML = '<div class="info-box info-nocharge">No invoice will be sent. The draft will be zeroed and closed.</div>'
+      +'<div class="actions"><button class="btn-ghost" onclick="doNoCharge(\''+id+'\')">Confirm - no charge</button></div>';
+  }
+}
+
+function pickMethod(id, method){
+  var rec = records.find(function(r){return r.id===id;});
+  if(rec) rec.paymentMethod = method;
+  ['cash','card','eft'].forEach(function(m){
+    var el = document.getElementById('m-'+m+'-'+id);
+    if(el) el.classList.toggle('sel', method.toLowerCase().replace(' ','').startsWith(m));
+  });
+}
+
+function toApproval(id){
+  var rec = records.find(function(r){return r.id===id;});
+  if(!rec) return;
+  var amountEl = document.getElementById('amount-'+id);
+  if(amountEl){
+    var entered = parseFloat(amountEl.value);
+    if(!isNaN(entered) && calcTotal(rec.lineItems)>0){
+      var scale = entered/calcTotal(rec.lineItems);
+      rec.lineItems = rec.lineItems.map(function(i){return Object.assign({},i,{rate:parseFloat((i.rate*scale).toFixed(2))});});
+    }
+  }
+  rec.stage = 'approval';
+  fade(id, function(){renderAll(); switchTab('approval', document.getElementById('tab-btn-approval'));});
+}
+
+function doNoCharge(id){
+  var rec = records.find(function(r){return r.id===id;});
+  if(!rec) return;
+  rec.stage='done'; rec.paymentMethod='No charge';
+  rec.lineItems = rec.lineItems.map(function(i){return Object.assign({},i,{rate:0});});
+  fade(id, renderAll);
+}
+
+// APPROVAL
+function approvalHtml(rec){
+  var isEft = rec.paymentChoice==='eft';
+  return '<div class="info-box '+(isEft?'info-eft':'info-paid')+'" style="margin-bottom:14px">'
+    +(isEft ? 'Unpaid invoice - will request EFT from '+rec.patientEmail : 'Paid via '+(rec.paymentMethod||'-')+' - receipt to '+rec.patientEmail)
+    +'</div>'
+    +'<div style="margin-bottom:12px">'
+    +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px">'
+    +'<span style="font-size:13px;color:var(--text-secondary);min-width:110px">Primary ICD-10</span>'
+    +'<div class="icd-wrap"><input class="icd-input" type="text" id="icd-'+rec.id+'" value="'+(rec.icd||defaultIcd())+'" placeholder="M99.11" autocomplete="off"'
+    +' oninput="filterIcd(\''+rec.id+'\',this.value,\'p\')" onfocus="filterIcd(\''+rec.id+'\',this.value,\'p\')" onblur="setTimeout(function(){hideIcdDd(\'iddp-'+rec.id+'\')},180)">'
+    +'<div class="icd-dropdown" id="iddp-'+rec.id+'" style="display:none"></div></div></div>'
+    +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    +'<span style="font-size:13px;color:var(--text-secondary);min-width:110px">Secondary ICD-10</span>'
+    +'<div class="icd-wrap"><input class="icd-input" type="text" id="icd2-'+rec.id+'" value="" placeholder="Optional - add for 04334+" autocomplete="off"'
+    +' oninput="filterIcd(\''+rec.id+'\',this.value,\'s\')" onfocus="filterIcd(\''+rec.id+'\',this.value,\'s\')" onblur="setTimeout(function(){hideIcdDd(\'idds-'+rec.id+'\')},180)">'
+    +'<div class="icd-dropdown" id="idds-'+rec.id+'" style="display:none"></div></div></div>'
+    +'<div class="icd-warning" id="icd-warn-'+rec.id+'">Codes 04334-04336 require a distinct secondary ICD-10 code per Discovery Health rule 004.</div>'
+    +'</div>'
+    +'<div class="section-label">Line items</div>'
+    +'<table class="line-items"><thead><tr>'
+    +'<th class="col-code">Code</th><th>Description</th><th class="col-qty">Qty</th><th class="col-rate">Rate (R)</th><th class="col-amt">Amount</th><th class="col-del"></th>'
+    +'</tr></thead><tbody id="tbody-'+rec.id+'"></tbody></table>'
+    +'<button class="add-line" onclick="addLine(\''+rec.id+'\')">+ Add line item</button>'
+    +'<div class="totals-row"><span>VAT (0% - healthcare exempt)</span><span>R0.00</span><span>Total</span><strong id="total-'+rec.id+'">-</strong></div>'
+    +'<div class="ai-row"><input class="ai-input" id="ai-'+rec.id+'" placeholder="Ask AI to adjust line items...">'
+    +'<button class="ai-btn" id="ai-btn-'+rec.id+'" onclick="aiSuggest(\''+rec.id+'\')">Ask AI</button></div>'
+    +'<div class="actions">'
+    +'<button class="btn-green" id="send-btn-'+rec.id+'" onclick="approveAndSend(\''+rec.id+'\')">'+(isEft?'Approve &amp; send invoice':'Approve &amp; send receipt')+'</button>'
+    +'<button class="btn-ghost" onclick="previewInvoice(\''+rec.id+'\')">Preview PDF</button>'
+    +'<button class="btn-ghost" onclick="backToCheckin(\''+rec.id+'\')">Back</button>'
+    +'<span id="smsg-'+rec.id+'" class="smsg" style="display:none"></span></div>';
+}
+
+function initTbody(id){
+  var rec = records.find(function(r){return r.id===id;});
+  var tbody = document.getElementById('tbody-'+id);
+  if(!rec||!tbody||tbody.children.length) return;
+  rec.lineItems.forEach(function(item,idx){appendRow(id,item,idx);});
+  refreshTotal(id);
+}
+
+function appendRow(id, item, idx){
+  var tbody = document.getElementById('tbody-'+id);
+  if(!tbody) return;
+  var tr = document.createElement('tr');
+  tr.id = 'tr-'+id+'-'+idx;
+  tr.innerHTML = '<td class="col-code"><input type="text" value="'+(item.code||'')+'" oninput="refreshTotal(\''+id+'\')"></td>'
+    +'<td><input type="text" value="'+(item.description||'')+'" oninput="refreshTotal(\''+id+'\')"></td>'
+    +'<td class="col-qty"><input type="number" value="'+(item.qty||1)+'" min="1" style="text-align:center" oninput="refreshTotal(\''+id+'\')"></td>'
+    +'<td class="col-rate"><input type="number" value="'+(item.rate||0)+'" step="10" style="text-align:right" oninput="refreshTotal(\''+id+'\')"></td>'
+    +'<td class="col-amt" id="amt-'+id+'-'+idx+'">'+fmtZar((item.qty||1)*(item.rate||0))+'</td>'
+    +'<td class="col-del"><button class="del-btn" onclick="delRow(\''+id+'\',\''+id+'-'+idx+'\')">x</button></td>';
+  tbody.appendChild(tr);
+}
+
+function addLine(id){
+  openLookup(function(code, description, rate){
+    var tbody = document.getElementById('tbody-'+id);
+    appendRow(id, {code:code, description:description, qty:1, rate:rate}, tbody?tbody.children.length:0);
+    refreshTotal(id);
+  });
+}
+
+function delRow(id, suffix){ document.getElementById('tr-'+suffix) && document.getElementById('tr-'+suffix).remove(); refreshTotal(id); }
+
+function getLineItems(id){
+  var tbody = document.getElementById('tbody-'+id);
+  if(!tbody) return [];
+  return Array.from(tbody.querySelectorAll('tr')).map(function(tr){
+    var inp = tr.querySelectorAll('input');
+    return {code:inp[0]&&inp[0].value||'', description:inp[1]&&inp[1].value||'', qty:parseFloat(inp[2]&&inp[2].value||1), rate:parseFloat(inp[3]&&inp[3].value||0)};
+  });
+}
+
+function refreshTotal(id){
+  var items = getLineItems(id);
+  var el = document.getElementById('total-'+id);
+  if(el) el.textContent = fmtZar(calcTotal(items));
+  var tbody = document.getElementById('tbody-'+id);
+  if(!tbody) return;
+  Array.from(tbody.querySelectorAll('tr')).forEach(function(tr){
+    var inp = tr.querySelectorAll('input');
+    var a = tr.querySelector('[id^="amt-"]');
+    if(a) a.textContent = fmtZar(parseFloat(inp[2]&&inp[2].value||1)*parseFloat(inp[3]&&inp[3].value||0));
+  });
+  checkIcdCompliance(id);
+}
+
+// ICD-10
+var ICD_CODES = [
+  {s:'Spine - cervical',code:'M99.11',desc:'Segmental dysfunction, cervical region'},
+  {s:'Spine - cervical',code:'M99.01',desc:'Segmental subluxation, cervical region'},
+  {s:'Spine - cervical',code:'M54.2',desc:'Cervicalgia'},
+  {s:'Spine - cervical',code:'M54.22',desc:'Cervicalgia, cervical region'},
+  {s:'Spine - cervical',code:'M54.23',desc:'Cervicalgia, cervicothoracic region'},
+  {s:'Spine - cervical',code:'M50.1',desc:'Cervical disc disorder with radiculopathy'},
+  {s:'Spine - cervical',code:'M50.2',desc:'Cervical disc displacement'},
+  {s:'Spine - thoracic',code:'M99.12',desc:'Segmental dysfunction, thoracic region'},
+  {s:'Spine - thoracic',code:'M54.6',desc:'Pain in thoracic spine'},
+  {s:'Spine - thoracic',code:'M51.14',desc:'Thoracic disc disorder with radiculopathy'},
+  {s:'Spine - lumbar',code:'M99.13',desc:'Segmental dysfunction, lumbar region'},
+  {s:'Spine - lumbar',code:'M99.03',desc:'Segmental subluxation, lumbar region'},
+  {s:'Spine - lumbar',code:'M54.5',desc:'Low back pain'},
+  {s:'Spine - lumbar',code:'M54.4',desc:'Lumbago with sciatica'},
+  {s:'Spine - lumbar',code:'M54.3',desc:'Sciatica'},
+  {s:'Spine - lumbar',code:'M51.16',desc:'Lumbar disc disorder with radiculopathy'},
+  {s:'Spine - lumbar',code:'M51.17',desc:'Lumbosacral disc disorder with radiculopathy'},
+  {s:'Spine - sacral',code:'M99.14',desc:'Segmental dysfunction, sacral region'},
+  {s:'Spine - sacral',code:'M53.3',desc:'Sacrococcygeal disorders'},
+  {s:'Pelvis & SI joint',code:'M99.15',desc:'Segmental dysfunction, pelvic region'},
+  {s:'Pelvis & SI joint',code:'M54.58',desc:'Low back pain, sacral region'},
+  {s:'Headache & cranial',code:'M99.10',desc:'Segmental dysfunction, head region'},
+  {s:'Headache & cranial',code:'G44.2',desc:'Tension-type headache'},
+  {s:'Headache & cranial',code:'G44.0',desc:'Cluster headache syndrome'},
+  {s:'Headache & cranial',code:'G43.9',desc:'Migraine, unspecified'},
+  {s:'Shoulder',code:'M75.1',desc:'Rotator cuff syndrome'},
+  {s:'Shoulder',code:'M75.0',desc:'Adhesive capsulitis (frozen shoulder)'},
+  {s:'Shoulder',code:'M75.4',desc:'Impingement syndrome of shoulder'},
+  {s:'Shoulder',code:'M75.5',desc:'Bursitis of shoulder'},
+  {s:'Shoulder',code:'M99.17',desc:'Segmental dysfunction, upper extremity'},
+  {s:'Elbow & arm',code:'M77.1',desc:'Lateral epicondylitis (tennis elbow)'},
+  {s:'Elbow & arm',code:'M77.0',desc:'Medial epicondylitis (golfer elbow)'},
+  {s:'Wrist & hand',code:'G56.0',desc:'Carpal tunnel syndrome'},
+  {s:'Wrist & hand',code:'M65.3',desc:'Trigger finger'},
+  {s:'Hip & thigh',code:'M16.9',desc:'Coxarthrosis, unspecified'},
+  {s:'Hip & thigh',code:'M25.55',desc:'Pain in hip'},
+  {s:'Knee',code:'M25.56',desc:'Pain in knee'},
+  {s:'Knee',code:'M22.2',desc:'Patellofemoral disorders'},
+  {s:'Knee',code:'M23.9',desc:'Internal derangement of knee'},
+  {s:'Ankle & foot',code:'M77.3',desc:'Calcaneal spur'},
+  {s:'Ankle & foot',code:'M79.67',desc:'Pain in foot'},
+  {s:'Muscle & soft tissue',code:'M79.1',desc:'Myalgia'},
+  {s:'Muscle & soft tissue',code:'M79.7',desc:'Fibromyalgia'},
+  {s:'Muscle & soft tissue',code:'M54.9',desc:'Dorsalgia, unspecified'},
+  {s:'Radiculopathy & nerve',code:'M54.1',desc:'Radiculopathy'},
+  {s:'Radiculopathy & nerve',code:'M54.12',desc:'Radiculopathy, cervical region'},
+  {s:'Radiculopathy & nerve',code:'M54.13',desc:'Radiculopathy, cervicothoracic region'},
+  {s:'Radiculopathy & nerve',code:'M54.16',desc:'Radiculopathy, lumbar region'},
+  {s:'Radiculopathy & nerve',code:'M54.17',desc:'Radiculopathy, lumbosacral region'},
+  {s:'Radiculopathy & nerve',code:'G54.2',desc:'Cervical root disorders'},
+  {s:'Radiculopathy & nerve',code:'G54.3',desc:'Thoracic root disorders'},
+  {s:'Radiculopathy & nerve',code:'G54.4',desc:'Lumbosacral root disorders'},
+  {s:'Postural & structural',code:'M40.0',desc:'Postural kyphosis'},
+  {s:'Postural & structural',code:'M41.9',desc:'Scoliosis, unspecified'},
+  {s:'Postural & structural',code:'M43.6',desc:'Torticollis'},
+  {s:'Postural & structural',code:'M48.0',desc:'Spinal stenosis'},
+  {s:'Postural & structural',code:'M47.816',desc:'Spondylosis with radiculopathy, lumbar'},
+  {s:'Injury & acute',code:'S13.4',desc:'Sprain of cervical spine ligaments'},
+  {s:'Injury & acute',code:'S23.3',desc:'Sprain of thoracic spine ligaments'},
+  {s:'Injury & acute',code:'S33.5',desc:'Sprain of lumbar spine ligaments'},
+  {s:'Injury & acute',code:'S09.9',desc:'Unspecified head injury (whiplash)'},
+  {s:'TMJ & jaw',code:'K07.6',desc:'Temporomandibular joint disorders'},
+  {s:'TMJ & jaw',code:'K07.62',desc:'Arthralgia of TMJ'},
+  {s:'TMJ & jaw',code:'K07.63',desc:'Articular disc disorder of TMJ'},
+  {s:'TMJ & jaw',code:'K07.64',desc:'Inflammatory conditions of TMJ'},
+  {s:'TMJ & jaw',code:'M26.60',desc:'TMJ disorder, unspecified'},
+  {s:'TMJ & jaw',code:'M26.62',desc:'Arthralgia of TMJ (musculoskeletal)'},
+  {s:'TMJ & jaw',code:'M26.63',desc:'Articular disc disorder of TMJ'},
+  {s:'TMJ & jaw',code:'M79.12',desc:'Myalgia of jaw muscles'},
+  {s:'TMJ & jaw',code:'S03.0',desc:'Dislocation of jaw'},
+  {s:'TMJ & jaw',code:'S03.4',desc:'Sprain of jaw'}
+];
+
+function filterIcd(recId, query, pos){
+  var ddId = pos==='p' ? 'iddp-'+recId : 'idds-'+recId;
+  var dd = document.getElementById(ddId);
+  if(!dd) return;
+  var q = query.trim().toLowerCase();
+  var filtered = q ? ICD_CODES.filter(function(c){return c.code.toLowerCase().indexOf(q)!==-1||c.desc.toLowerCase().indexOf(q)!==-1;}) : ICD_CODES;
+  if(!filtered.length){ dd.innerHTML='<div class="icd-empty-msg">No matching codes</div>'; dd.style.display='block'; return; }
+  var html='', lastS='';
+  filtered.slice(0,40).forEach(function(c){
+    if(c.s!==lastS){ html+='<div class="icd-section">'+c.s+'</div>'; lastS=c.s; }
+    html+='<div class="icd-option" onmousedown="pickIcd(\''+recId+'\',\''+c.code+'\',\''+pos+'\')"><span class="icd-opt-code">'+c.code+'</span><span class="icd-opt-desc">'+c.desc+'</span></div>';
+  });
+  if(filtered.length>40) html+='<div class="icd-empty-msg">Showing 40 of '+filtered.length+' - type more to narrow</div>';
+  dd.innerHTML=html; dd.style.display='block';
+}
+
+function pickIcd(recId, code, pos){
+  var inputId = pos==='p' ? 'icd-'+recId : 'icd2-'+recId;
+  var ddId = pos==='p' ? 'iddp-'+recId : 'idds-'+recId;
+  var el = document.getElementById(inputId);
+  if(el) el.value=code;
+  hideIcdDd(ddId);
+  checkIcdCompliance(recId);
+}
+
+function hideIcdDd(ddId){ var dd=document.getElementById(ddId); if(dd) dd.style.display='none'; }
+
+function checkIcdCompliance(recId){
+  var items = getLineItems(recId);
+  var has4plus = items.some(function(i){return ['04334','04335','04336'].indexOf(i.code)!==-1;});
+  var sec = (document.getElementById('icd2-'+recId)||{}).value||'';
+  var warn = document.getElementById('icd-warn-'+recId);
+  if(warn) warn.style.display = (has4plus&&!sec.trim()) ? 'block' : 'none';
+}
+
+// AI SUGGEST
+function aiSuggest(id){
+  var btn = document.getElementById('ai-btn-'+id);
+  var inputEl = document.getElementById('ai-'+id);
+  var prompt = inputEl&&inputEl.value.trim();
+  if(!prompt) return;
+  btn.disabled=true; btn.textContent='Thinking...';
+  var icd = (document.getElementById('icd-'+id)||{}).value||defaultIcd();
+  fetch(getClaudeApi(),{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      model:'claude-sonnet-4-6',max_tokens:600,
+      system:'South African chiropractic billing. Return ONLY a JSON array [{code,description,qty,rate}] using NHRPL codes, rates in ZAR. Codes: 04301 Consultation R300, 04311 Single diagnostic R108.10, 04312 Two diagnostic R162.10, 04313 Three diagnostic R216.20, 04331 Single treatment R43.20, 04332 Two treatment R64.80, 04333 Three treatment R86.50, 04334 Four treatment R108.10. ICD-10: '+icd+'. No other text.',
+      messages:[{role:'user',content:'Current: '+JSON.stringify(getLineItems(id))+'\nInstruction: '+prompt}]
+    })
+  }).then(function(r){return r.json();}).then(function(data){
+    var text = data.content.map(function(b){return b.text||'';}).join('');
+    var newItems = JSON.parse(text.replace(/```json|```/g,'').trim());
+    var tbody = document.getElementById('tbody-'+id);
+    if(tbody){ tbody.innerHTML=''; newItems.forEach(function(item,idx){appendRow(id,item,idx);}); refreshTotal(id); }
+    if(inputEl) inputEl.value='';
+    showMsg(id,'Updated by AI','ok');
+  }).catch(function(){ showMsg(id,'AI error - try again','err'); })
+  .finally(function(){ btn.disabled=false; btn.textContent='Ask AI'; });
+}
+
+// APPROVE & SEND
+function approveAndSend(id){
+  var rec = records.find(function(r){return r.id===id;});
+  if(!rec) return;
+  var lineItems = getLineItems(id)||rec.lineItems;
+  var icd  = (document.getElementById('icd-' +id)||{}).value||defaultIcd();
+  var icd2 = (document.getElementById('icd2-'+id)||{}).value||'';
+  var isEft = rec.paymentChoice==='eft';
+  var total = lineItems.reduce(function(s,i){return s+(parseFloat(i.qty||1)*parseFloat(i.rate||0));},0);
+
+  // Build email body as plain text
+  var lineText = lineItems.map(function(i){
+    return i.code+' '+i.description+' x'+i.qty+' = R'+parseFloat((i.qty||1)*(i.rate||0)).toFixed(2);
+  }).join('%0D%0A');
+
+  var icdText = 'ICD-10: '+icd+(icd2?' / '+icd2:'');
+
+  var subject = encodeURIComponent(isEft
+    ? 'Invoice '+rec.invoiceNumber+' - Payment required - '+PRACTICE.name
+    : 'Invoice '+rec.invoiceNumber+' - Receipt - '+PRACTICE.name);
+
+  var greeting = 'Dear '+rec.patientName.split(' ')[0]+',';
+  var footer   = 'Kind regards,%0D%0A'+PRACTICE.name+'%0D%0A'+PRACTICE.phone+'%0D%0A'+PRACTICE.email;
+
+  var bodyText = isEft
+    ? greeting+'%0D%0A%0D%0AThank you for your visit today. Please find your invoice details below:%0D%0A%0D%0A'
+      +lineText+'%0D%0A'+icdText
+      +'%0D%0A%0D%0ATOTAL DUE: R'+total.toFixed(2)
+      +'%0D%0A%0D%0APlease EFT payment to:%0D%0APractice No: '+PRACTICE.practiceNo
+      +'%0D%0AReference: Your name and '+rec.invoiceNumber
+      +'%0D%0A%0D%0A'+footer
+    : greeting+'%0D%0A%0D%0AThank you for your payment. Please find your receipt below:%0D%0A%0D%0A'
+      +lineText+'%0D%0A'+icdText
+      +'%0D%0A%0D%0ATOTAL PAID: R'+total.toFixed(2)+' ('+( rec.paymentMethod||'')+')'
+      +'%0D%0A%0D%0A'+footer;
+
+  window.location.href = 'mailto:'+encodeURIComponent(rec.patientEmail)+'?subject='+subject+'&body='+bodyText;
+
+  // Mark record as sent
+  rec.stage = isEft ? 'eft' : 'done';
+  rec.icd=icd; rec.lineItems=lineItems;
+  setTimeout(function(){ fade(id, renderAll); }, 500);
+}
+
+function backToCheckin(id){
+  var rec=records.find(function(r){return r.id===id;});
+  if(rec){rec.stage='checkin';rec.paymentChoice=null;rec.paymentMethod=null;}
+  fade(id,function(){renderAll();switchTab('checkin',document.getElementById('tab-btn-checkin'));});
+}
+
+// PREVIEW PDF
+function previewInvoice(id){
+  var rec = records.find(function(r){return r.id===id;});
+  if(!rec) return;
+  var url = backendUrl();
+  if(isRealBackend()){
+    fetch(url+'/.netlify/functions/wix?action=getInvoicePdfUrl',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({invoiceId:rec.invoiceId})})
+    .then(function(r){return r.json();})
+    .then(function(data){if(data.url) window.open(data.url,'_blank'); else showMsg(id,'Could not fetch PDF','err');})
+    .catch(function(){showMsg(id,'PDF fetch failed','err');});
+    return;
+  }
+  var lineItems = getLineItems(id)||rec.lineItems;
+  var icd=(document.getElementById('icd-'+id)||{}).value||rec.icd||'M99.11';
+  var icd2=(document.getElementById('icd2-'+id)||{}).value||'';
+  var total=lineItems.reduce(function(s,i){return s+(parseFloat(i.qty||1)*parseFloat(i.rate||0));},0);
+  var isEft=rec.paymentChoice==='eft';
+  var isPaid=rec.paymentChoice==='paid';
+  var dateStr=new Date().toLocaleDateString('en-ZA',{day:'numeric',month:'long',year:'numeric'});
+  var apptStr=new Date(rec.appointmentTime).toLocaleString('en-ZA',{weekday:'long',day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  var rows=lineItems.map(function(item){
+    return '<tr>'
+      +'<td style="padding:10px 12px;border-bottom:1px solid #eee;font-size:13px;color:#666">'+item.code+'</td>'
+      +'<td style="padding:10px 12px;border-bottom:1px solid #eee;font-size:13px">'+item.description+'</td>'
+      +'<td style="padding:10px 12px;border-bottom:1px solid #eee;font-size:13px;text-align:center">'+item.qty+'</td>'
+      +'<td style="padding:10px 12px;border-bottom:1px solid #eee;font-size:13px;text-align:right">R'+parseFloat(item.rate).toFixed(2)+'</td>'
+      +'<td style="padding:10px 12px;border-bottom:1px solid #eee;font-size:13px;text-align:right;font-weight:500">R'+(parseFloat(item.qty||1)*parseFloat(item.rate||0)).toFixed(2)+'</td>'
+      +'</tr>';
+  }).join('');
+  var badge=isEft?'<span style="background:#EEEDFE;color:#3C3489;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:500">Payment pending - EFT</span>'
+    :isPaid?'<span style="background:#E1F5EE;color:#085041;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:500">Paid - '+(rec.paymentMethod||'')+'</span>'
+    :'<span style="background:#FAEEDA;color:#633806;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:500">Draft</span>';
+  var eftBlock=isEft?'<div style="margin:0 40px 32px;padding:16px 20px;background:#EEEDFE;border-radius:8px"><div style="font-size:13px;font-weight:600;color:#3C3489;margin-bottom:8px">Payment instructions</div><div style="font-size:13px;color:#534AB7;line-height:1.7">Please EFT using your name as reference. Send proof of payment to '+PRACTICE.email+'</div></div>':'';
+  var icd2Html=icd2?'<div><div class="label">Secondary ICD-10</div><div class="value" style="font-family:monospace">'+icd2+'</div></div>':'<div></div>';
+  var css='*{box-sizing:border-box;margin:0;padding:0}'
+    +'body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f5f3;padding:2rem 1rem;color:#1a1a18}'
+    +'.page{max-width:720px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden}'
+    +'.header{padding:36px 40px 28px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:flex-start}'
+    +'.practice-name{font-size:20px;font-weight:700;margin-bottom:6px}'
+    +'.practice-detail{font-size:12px;color:#6b6b66;line-height:1.8}'
+    +'.invoice-meta{text-align:right}'
+    +'.invoice-title{font-size:28px;font-weight:300;letter-spacing:-0.5px;margin-bottom:8px}'
+    +'.invoice-num{font-size:13px;color:#6b6b66;margin-bottom:4px}'
+    +'.body{padding:32px 40px}'
+    +'.two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:28px}'
+    +'.label{font-size:11px;font-weight:600;color:#9c9a94;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}'
+    +'.value{font-size:14px;line-height:1.5}'
+    +'table{width:100%;border-collapse:collapse}'
+    +'thead tr{background:#f9f9f7}'
+    +'thead th{padding:10px 12px;font-size:11px;font-weight:600;color:#9c9a94;text-transform:uppercase;text-align:left;border-bottom:1px solid #eee}'
+    +'.totals{padding:16px 40px 32px}'
+    +'.total-row{display:flex;justify-content:space-between;font-size:13px;color:#6b6b66;padding:5px 0}'
+    +'.total-final{font-size:18px;font-weight:700;color:#1a1a18;padding-top:10px;border-top:2px solid #1a1a18;margin-top:4px}'
+    +'.footer{padding:20px 40px;background:#f9f9f7;border-top:1px solid #eee;font-size:11px;color:#9c9a94;display:flex;justify-content:space-between}'
+    +'@media print{body{background:white;padding:0}.page{border-radius:0}}';
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Invoice '+rec.invoiceNumber+'</title><style>'+css+'</style></head><body>'
+    +'<div class="page">'
+    +'<div class="header"><div>'
+    +'<div class="practice-name">'+PRACTICE.name+'</div>'
+    +'<div class="practice-detail">'+PRACTICE.qual+'<br>Practice No: '+PRACTICE.practiceNo+'<br>'+PRACTICE.address+'<br>'+PRACTICE.phone+' &middot; '+PRACTICE.email+'</div>'
+    +'</div><div class="invoice-meta">'
+    +'<div class="invoice-title">Invoice</div>'
+    +'<div class="invoice-num">'+rec.invoiceNumber+'</div>'
+    +'<div class="invoice-num" style="margin-top:4px">'+dateStr+'</div>'
+    +'<div style="margin-top:10px">'+badge+'</div>'
+    +'</div></div>'
+    +'<div class="body"><div class="two-col">'
+    +'<div><div class="label">Patient</div><div class="value">'+rec.patientName+'<br><span style="color:#6b6b66;font-size:13px">'+rec.patientEmail+'</span></div></div>'
+    +'<div><div class="label">Appointment</div><div class="value">'+apptStr+'</div></div>'
+    +'<div><div class="label">Primary ICD-10</div><div class="value" style="font-family:monospace">'+icd+'</div></div>'
+    +icd2Html+'</div>'
+    +'<table><thead><tr>'
+    +'<th style="width:90px">Code</th><th>Description</th><th style="width:50px;text-align:center">Qty</th><th style="width:100px;text-align:right">Rate</th><th style="width:100px;text-align:right">Amount</th>'
+    +'</tr></thead><tbody>'+rows+'</tbody></table></div>'
+    +'<div class="totals">'
+    +'<div class="total-row"><span>Subtotal</span><span>R'+total.toFixed(2)+'</span></div>'
+    +'<div class="total-row"><span>VAT (0% - healthcare exempt)</span><span>R0.00</span></div>'
+    +'<div class="total-row total-final"><span>Total due</span><span>R'+total.toFixed(2)+'</span></div>'
+    +'</div>'+eftBlock
+    +'<div class="footer"><span>'+PRACTICE.name+' &middot; Practice No: '+PRACTICE.practiceNo+'</span><span>VAT exempt - healthcare services</span></div>'
+    +'</div></body></html>';
+  var blob=new Blob([html],{type:'text/html'});
+  window.open(URL.createObjectURL(blob),'_blank');
+}
+
+// EFT TAB
+function eftHtml(rec){
+  return '<div class="info-box info-eft" style="margin-bottom:12px">Invoice sent - awaiting EFT of '+fmtZar(calcTotal(rec.lineItems))+' from '+rec.patientEmail+'</div>'
+    +'<div class="actions"><button class="btn-green" onclick="markEftPaid(\''+rec.id+'\')">Mark as paid</button>'
+    +'<button class="btn-ghost" onclick="resendEft(\''+rec.id+'\')">Resend invoice</button>'
+    +'<span id="smsg-'+rec.id+'" class="smsg" style="display:none"></span></div>';
+}
+
+function markEftPaid(id){
+  var rec=records.find(function(r){return r.id===id;});
+  if(rec){rec.stage='done';rec.paymentMethod='EFT received';}
+  fade(id, renderAll);
+}
+
+function resendEft(id){ showMsg(id,'Invoice resent','ok'); }
+
+// DONE TAB
+function doneHtml(rec){
+  var label = rec.paymentMethod==='No charge'
+    ? 'Marked as no charge - no invoice sent.'
+    : 'Invoice sent to '+rec.patientEmail+' - Paid via '+(rec.paymentMethod||'-');
+  return '<div class="info-box info-paid">'+label+'</div>';
+}
+
+// HELPERS
+function showMsg(id, msg, type){
+  var el=document.getElementById('smsg-'+id);
+  if(!el) return;
+  el.textContent=msg; el.className='smsg smsg-'+(type==='ok'?'ok':'err'); el.style.display='inline-block';
+  if(type==='ok') setTimeout(function(){el.style.display='none';},3500);
+}
+
+function fade(id, cb){
+  var card=document.getElementById('card-'+id);
+  if(card){card.classList.add('fading');setTimeout(cb,280);}else cb();
+}
+
+// CODE LOOKUP
+var lookupCallback = null;
+
+function openLookup(cb){
+  lookupCallback = cb;
+  var overlay = document.createElement('div');
+  overlay.className='lookup-overlay'; overlay.id='lookup-overlay';
+  overlay.innerHTML='<div class="lookup-box"><div class="lookup-header"><input class="lookup-search" id="lookup-search" placeholder="Search by code or description..." autofocus oninput="filterLookup(this.value)"><button class="lookup-close" onclick="closeLookup()">x</button></div><div class="lookup-results" id="lookup-results"></div></div>';
+  overlay.addEventListener('click',function(e){if(e.target===overlay)closeLookup();});
+  document.querySelector('.page').appendChild(overlay);
+  filterLookup('');
+  setTimeout(function(){var s=document.getElementById('lookup-search');if(s)s.focus();},50);
+}
+
+function closeLookup(){ document.getElementById('lookup-overlay')&&document.getElementById('lookup-overlay').remove(); lookupCallback=null; }
+
+var RPL_CODES = [
+  {section:'Consultations',code:'04301',description:'Consultation',rate:300},
+  {section:'Diagnostic procedures',code:'04311',description:'Single diagnostic procedure',rate:108.10},
+  {section:'Diagnostic procedures',code:'04312',description:'Two diagnostic procedures',rate:162.10},
+  {section:'Diagnostic procedures',code:'04313',description:'Three diagnostic procedures',rate:216.20},
+  {section:'Immobilisation / therapeutic exercises',code:'04321',description:'Single immobilisation or therapeutic exercise',rate:43.20},
+  {section:'Immobilisation / therapeutic exercises',code:'04322',description:'Two immobilisation or therapeutic exercises',rate:64.80},
+  {section:'Treatment procedures',code:'04331',description:'Single treatment procedure',rate:43.20},
+  {section:'Treatment procedures',code:'04332',description:'Two treatment procedures',rate:64.80},
+  {section:'Treatment procedures',code:'04333',description:'Three treatment procedures',rate:86.50},
+  {section:'Treatment procedures',code:'04334',description:'Four treatment procedures',rate:108.10},
+  {section:'Treatment procedures',code:'04335',description:'Five treatment procedures',rate:129.70},
+  {section:'Treatment procedures',code:'04336',description:'Six treatment procedures',rate:151.30},
+  {section:'Consumables',code:'04100',description:'Medication / material (Nappi code required)',rate:null},
+  {section:'Consumables',code:'04110',description:'X-Ray films',rate:null},
+  {section:'No-show',code:'04107',description:'Appointment not kept',rate:null}
+];
+
+function filterLookup(query){
+  var q=query.toLowerCase();
+  var results=document.getElementById('lookup-results');
+  if(!results) return;
+  var filtered=q?RPL_CODES.filter(function(c){return c.code.indexOf(q)!==-1||c.description.toLowerCase().indexOf(q)!==-1;}):RPL_CODES;
+  if(!filtered.length){results.innerHTML='<div class="lookup-empty">No codes found</div>';return;}
+  var html='',lastSection='';
+  filtered.forEach(function(c){
+    if(c.section!==lastSection){html+='<div class="lookup-section">'+c.section+'</div>';lastSection=c.section;}
+    html+='<div class="lookup-row" onclick="selectCode(\''+c.code+'\',\''+c.description.replace(/'/g,'')+'\','+(c.rate||0)+')">'
+      +'<span class="lookup-code">'+c.code+'</span>'
+      +'<span class="lookup-desc">'+c.description+'</span>'
+      +'<span class="lookup-rate">'+(c.rate?fmtZar(c.rate):'-')+'</span></div>';
+  });
+  results.innerHTML=html;
+}
+
+function selectCode(code, description, rate){
+  if(lookupCallback) lookupCallback(code, description, rate);
+  closeLookup();
+}
+
+// DEFAULT ITEMS
+function defaultItems(appointmentTime){
+  var isAfterHours = appointmentTime ? new Date(appointmentTime).getHours()>=19 : false;
+  return [
+    {code:'04301',description:'Consultation'+(isAfterHours?' (after hours)':''),qty:1,rate:isAfterHours?420:300},
+    {code:'04312',description:'Two Diagnostic Procedures',qty:1,rate:250},
+    {code:'04333',description:'Three Treatment Procedures',qty:1,rate:180}
+  ];
+}
+
+// LOAD
+function loadAll(){
+  var btn=document.getElementById('refresh-btn');
+  btn.disabled=true; btn.textContent='Loading...';
+  ['checkin','approval','eft','done'].forEach(function(s){document.getElementById('panel-'+s).innerHTML='<div class="loading"><div class="spinner"></div> Fetching...</div>';});
+  if(!isRealBackend()){
+    records=demoData(); renderAll();
+    btn.disabled=false; btn.textContent='Refresh';
+    return;
+  }
+  queryWixBookings()
+  .then(function(data){
+    records=(data.pending||[]).map(function(inv){
+      return {id:inv.invoiceId,invoiceId:inv.invoiceId,invoiceNumber:inv.invoiceNumber,
+        patientName:inv.patientName,patientEmail:inv.patientEmail,
+        appointmentTime:inv.appointmentTime,stage:'checkin',
+        paymentChoice:null,paymentMethod:null,icd:defaultIcd(),
+        lineItems:inv.lineItems&&inv.lineItems.length?inv.lineItems:defaultItems(inv.appointmentTime)};
+    });
+    renderAll();
+  }).catch(function(){
+    records=demoData(); renderAll();
+  }).finally(function(){ btn.disabled=false; btn.textContent='Refresh'; });
+}
+
+
+// ── DIRECT WIX REST API ───────────────────────────────────────
+function wixHeaders(){
+  return {
+    'Content-Type':  'application/json',
+    'Authorization': WIX_API_KEY,
+    'wix-site-id':   WIX_SITE_ID,
+  };
+}
+
+function makeInvoiceNumber(){
+  var d=new Date();
+  return 'INV-'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'-'+String(Math.floor(Math.random()*900)+100);
+}
+
+function queryWixBookings(){
+  if(!isRealBackend()) return Promise.resolve({pending:[]});
+  var now=new Date();
+  var startOfDay=new Date(now.getFullYear(),now.getMonth(),now.getDate()).toISOString();
+  return fetch('https://www.wixapis.com/_api/bookings-reader/v2/extended-bookings/query',{
+    method:'POST',
+    headers:wixHeaders(),
+    body:JSON.stringify({
+      query:{
+        filter:{'booking.status':{'$in':['CONFIRMED','PENDING']}},
+        sort:[{fieldName:'booking._createdDate',order:'DESC'}],
+        paging:{limit:50}
+      }
+    })
+  }).then(function(r){return r.json();}).then(function(data){
+    var all = data.extendedBookings||data.bookings||[];
+    var today = all.filter(function(eb){
+      var b=eb.booking||eb;
+      var slot=(b.bookedEntity&&b.bookedEntity.slot)||{};
+      var d=slot.startDate||slot.start||b._createdDate||'';
+      return d>=startOfDay;
+    });
+    return {pending: today.map(function(eb){
+      var b=eb.booking||eb;
+      var contact=b.contactDetails||{};
+      var slot=(b.bookedEntity&&b.bookedEntity.slot)||{};
+      return {
+        invoiceId:b._id||b.id,
+        invoiceNumber:makeInvoiceNumber(),
+        patientName:((contact.firstName||'')+' '+(contact.lastName||'')).trim()||'Patient',
+        patientEmail:contact.email||contact.emailAddress||'',
+        appointmentTime:slot.startDate||slot.start||now.toISOString(),
+        lineItems:[],
+      };
+    })};
+  });
+}
+
+function queryWixBookingsByDate(from,to){
+  if(!isRealBackend()) return Promise.resolve([]);
+  return fetch('https://www.wixapis.com/_api/bookings-reader/v2/extended-bookings/query',{
+    method:'POST',
+    headers:wixHeaders(),
+    body:JSON.stringify({
+      query:{
+        filter:{'booking.status':{'$in':['CONFIRMED','PENDING','CANCELED']}},
+        sort:[{fieldName:'booking._createdDate',order:'DESC'}],
+        paging:{limit:100}
+      }
+    })
+  }).then(function(r){return r.json();}).then(function(data){
+    var all=data.extendedBookings||data.bookings||[];
+    var fromD=new Date(from), toD=new Date(to);
+    return all.filter(function(eb){
+      var b=eb.booking||eb;
+      var slot=(b.bookedEntity&&b.bookedEntity.slot)||{};
+      var d=new Date(slot.startDate||slot.start||b._createdDate||0);
+      return d>=fromD&&d<=toD;
+    }).map(function(eb){
+      var b=eb.booking||eb;
+      var contact=b.contactDetails||{};
+      var slot=(b.bookedEntity&&b.bookedEntity.slot)||{};
+      return {
+        id:b._id||b.id,
+        patient:((contact.firstName||'')+' '+(contact.lastName||'')).trim(),
+        email:contact.email||contact.emailAddress||'',
+        date:slot.startDate||slot.start||b._createdDate,
+        status:b.status,
+      };
+    });
+  });
+}
+// ─────────────────────────────────────────────────────────────
+
+function demoData(){
+  var ago=function(mins){return new Date(Date.now()-mins*60000).toISOString();};
+  var tonight=new Date(); tonight.setHours(19,30,0,0);
+  return [
+    {id:'demo-1',invoiceId:'demo-1',invoiceNumber:'INV-0051',patientName:'Sarah Johnson',patientEmail:'sarah@example.com',appointmentTime:ago(30),stage:'checkin',paymentChoice:null,paymentMethod:null,icd:'M99.11',lineItems:defaultItems(ago(30))},
+    {id:'demo-2',invoiceId:'demo-2',invoiceNumber:'INV-0052',patientName:'Michael van der Berg',patientEmail:'mvdb@example.com',appointmentTime:tonight.toISOString(),stage:'checkin',paymentChoice:null,paymentMethod:null,icd:'M54.5',lineItems:defaultItems(tonight.toISOString())},
+    {id:'demo-3',invoiceId:'demo-3',invoiceNumber:'INV-0053',patientName:'Priya Naidoo',patientEmail:'priya@example.com',appointmentTime:ago(90),stage:'checkin',paymentChoice:null,paymentMethod:null,icd:'K07.62',lineItems:[{code:'04301',description:'Consultation',qty:1,rate:300},{code:'04312',description:'Two Diagnostic Procedures',qty:1,rate:250},{code:'04332',description:'Two Treatment Procedures',qty:1,rate:180}]},
+    {id:'demo-4',invoiceId:'demo-4',invoiceNumber:'INV-0054',patientName:'James Petersen',patientEmail:'james@example.com',appointmentTime:ago(120),stage:'checkin',paymentChoice:null,paymentMethod:null,icd:'M54.4',lineItems:[{code:'04301',description:'Consultation',qty:1,rate:300},{code:'04313',description:'Three Diagnostic Procedures',qty:1,rate:216.20},{code:'04333',description:'Three Treatment Procedures',qty:1,rate:180}]},
+    {id:'demo-5',invoiceId:'demo-5',invoiceNumber:'INV-0055',patientName:'Amahle Dlamini',patientEmail:'amahle@example.com',appointmentTime:ago(45),stage:'checkin',paymentChoice:null,paymentMethod:null,icd:'M54.12',lineItems:[{code:'04301',description:'Consultation',qty:1,rate:300},{code:'04312',description:'Two Diagnostic Procedures',qty:1,rate:250},{code:'04334',description:'Four Treatment Procedures',qty:1,rate:108.10}]},
+    {id:'demo-6',invoiceId:'demo-6',invoiceNumber:'INV-0048',patientName:'Tariq Adams',patientEmail:'tariq@example.com',appointmentTime:ago(300),stage:'eft',paymentChoice:'eft',paymentMethod:null,icd:'M75.1',lineItems:[{code:'04301',description:'Consultation',qty:1,rate:300},{code:'04312',description:'Two Diagnostic Procedures',qty:1,rate:250},{code:'04333',description:'Three Treatment Procedures',qty:1,rate:180}]}
+  ];
+}
+
+// CHAT AGENT
+var chatOpen = false;
+var chatHistory = [];
+
+function toggleChat(){
+  chatOpen=!chatOpen;
+  var panel=document.getElementById('chat-panel');
+  if(panel) panel.classList.toggle('open',chatOpen);
+}
+
+function addChatMsg(role, html){
+  var msgs=document.getElementById('chat-messages');
+  if(!msgs) return;
+  var div=document.createElement('div');
+  div.className='cmsg cmsg-'+(role==='user'?'user':'ai');
+  div.innerHTML=html;
+  msgs.appendChild(div);
+  msgs.scrollTop=msgs.scrollHeight;
+}
+
+function addTypingIndicator(){
+  var msgs=document.getElementById('chat-messages');
+  var div=document.createElement('div');
+  div.className='cmsg cmsg-ai'; div.id='chat-typing';
+  div.innerHTML='<span class="cdot"></span><span class="cdot"></span><span class="cdot"></span>';
+  msgs.appendChild(div); msgs.scrollTop=msgs.scrollHeight;
+}
+
+function removeTypingIndicator(){ var el=document.getElementById('chat-typing'); if(el) el.remove(); }
+
+function askChat(text){ document.getElementById('chat-input').value=text; sendChat(); }
+
+function sendChat(){
+  var input=document.getElementById('chat-input');
+  var sendBtn=document.getElementById('chat-send');
+  var text=input?input.value.trim():'';
+  if(!text) return;
+  input.value='';
+  document.getElementById('chat-chips').style.display='none';
+  addChatMsg('user',text);
+  sendBtn.disabled=true;
+  addTypingIndicator();
+  chatHistory.push({role:'user',content:text});
+  var today=new Date().toISOString().split('T')[0];
+  fetch(getClaudeApi(),{method:'POST',headers:{'Content-Type':'application/json','x-api-key':ANTHROPIC_KEY,'anthropic-version':'2023-06-01'},
+    body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:400,
+      system:'Data planning assistant for a chiropractic practice. Given a user question output ONLY a JSON object: {"from":"ISO date","to":"ISO date","type":"bookings"|"invoices"|"both","question":"original"}. Today is '+today+'. "last week" = Mon-Sun of last week. "this month" = current month. "this week" = current week. No other text.',
+      messages:[{role:'user',content:text}]})
+  }).then(function(r){return r.json();}).then(function(planData){
+    if(!planData||!planData.content){throw new Error('API error: '+JSON.stringify(planData).slice(0,300));}
+    var plan=JSON.parse(planData.content.map(function(b){return b.text||'';}).join('').replace(/```json|```/g,'').trim());
+    var fetchData;
+    if(isRealBackend()){
+      fetchData = queryWixBookingsByDate(plan.from, plan.to).then(function(bookings){
+        return { bookings: bookings, invoices: [] };
+      });
+    } else {
+      fetchData = Promise.resolve({
+        bookings:[
+          {patient:'Sarah Johnson',email:'sarah@example.com',date:plan.from,status:'CONFIRMED'},
+          {patient:'Michael van der Berg',email:'mvdb@example.com',date:plan.from,status:'CONFIRMED'},
+          {patient:'Priya Naidoo',email:'priya@example.com',date:plan.to,status:'CONFIRMED'}
+        ],
+        invoices:[
+          {number:'INV-0041',patient:'Priya Naidoo',status:'PAID',total:730,currency:'ZAR',created:plan.from},
+          {number:'INV-0042',patient:'Sarah Johnson',status:'DRAFT',total:730,currency:'ZAR',created:plan.to},
+          {number:'INV-0043',patient:'Michael van der Berg',status:'DRAFT',total:850,currency:'ZAR',created:plan.to}
+        ]
+      });
+    }
+    return fetchData.then(function(rawData){
+      return fetch(getClaudeApi(),{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:600,
+          system:'Assistant for Ben Bradford Chiropractic. Answer questions about bookings and invoices concisely using plain text or simple HTML tables. Currency is ZAR (R). Be direct and specific.',
+          messages:chatHistory.concat([{role:'user',content:'Question: '+text+'\n\nData ('+plan.from.split('T')[0]+' to '+plan.to.split('T')[0]+'):\n'+JSON.stringify(rawData,null,2)}])})
+      }).then(function(r){return r.json();});
+    });
+  }).then(function(answerData){
+    var answer;
+    if(answerData && answerData.content && answerData.content.map) {
+      answer = answerData.content.map(function(b){return b.text||'';}).join('');
+    } else if(answerData && answerData.error) {
+      answer = 'API error: ' + JSON.stringify(answerData.error);
+    } else {
+      answer = 'Unexpected response: ' + JSON.stringify(answerData).slice(0,200);
+    }
+    removeTypingIndicator();
+    addChatMsg('ai',answer);
+    chatHistory.push({role:'assistant',content:answer});
+  }).catch(function(e){
+    removeTypingIndicator();
+    addChatMsg('ai','Error: ' + e.message);
+    console.error('Chat error:',e);
+  }).finally(function(){ sendBtn.disabled=false; if(input) input.focus(); });
+}
+
+function saveConfig(){
+  try{
+    localStorage.setItem('bbc_icd',   document.getElementById('default-icd').value||'');
+    localStorage.setItem('bbc_wak',   document.getElementById('wix-api-key').value||'');
+    localStorage.setItem('bbc_wsid',  document.getElementById('wix-site-id').value||'');
+    localStorage.setItem('bbc_aak',   document.getElementById('anthropic-key').value||'');
+  }catch(e){}
+}
+
+function loadConfig(){
+  try{
+    var icd  = localStorage.getItem('bbc_icd');
+    var wak  = localStorage.getItem('bbc_wak');
+    var wsid = localStorage.getItem('bbc_wsid');
+    var aak  = localStorage.getItem('bbc_aak');
+    if(icd)  { document.getElementById('default-icd').value   = icd; }
+    if(wak)  { document.getElementById('wix-api-key').value   = wak;  WIX_API_KEY   = wak; }
+    if(wsid) { document.getElementById('wix-site-id').value   = wsid; WIX_SITE_ID   = wsid; }
+    if(aak)  { document.getElementById('anthropic-key').value = aak;  ANTHROPIC_KEY = aak; }
+  }catch(e){}
+}
+
+document.addEventListener('DOMContentLoaded',function(){
+  document.getElementById('date-label').textContent=new Date().toLocaleDateString('en-ZA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  loadConfig();
+  var ci=document.getElementById('chat-input');
+  if(ci) ci.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();}});
+  loadAll();
+});
+</script>
+</body>
+</html>
