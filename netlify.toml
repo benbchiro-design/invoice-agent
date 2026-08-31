@@ -1,0 +1,7 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+# Checks Wix for new bookings every 15 minutes and WhatsApps a draft for approval.
+[functions."poll-bookings-scheduled"]
+  schedule = "*/15 * * * *"

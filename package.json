@@ -1,0 +1,9 @@
+{
+  "name": "invoice-agent",
+  "private": true,
+  "description": "Backend functions for WhatsApp-driven invoice approval",
+  "dependencies": {
+    "@netlify/blobs": "latest",
+    "nodemailer": "latest"
+  }
+}
