@@ -1,11 +1,12 @@
 // Scheduled function (see netlify.toml) - checks Wix for new bookings, drafts
-// an invoice for each one the agent hasn't seen yet, and WhatsApps you a
-// one-line summary to approve, mark paid, or decline by replying.
-// Requires env vars: WIX_API_KEY, WIX_SITE_ID, WHATSAPP_TO_NUMBER (your own
-// WhatsApp number, e.g. "27821234567"), plus WHATSAPP_TOKEN / WHATSAPP_PHONE_NUMBER_ID.
-const { invoicesStore, historyStore, msgIndexStore, getJSON, setJSON } = require('./lib/store');
+// an invoice for each one the agent hasn't seen yet, and asks wa-notify (the
+// existing SA Notify WhatsApp platform - see the wa-notify repo) to WhatsApp
+// you a one-line summary to approve, mark paid, or decline by replying.
+// Requires env vars: WIX_API_KEY, WIX_SITE_ID, WA_NOTIFY_BASE_URL,
+// WA_NOTIFY_SLUG, WA_NOTIFY_SECRET (see lib/wa-notify-client.js).
+const { invoicesStore, historyStore, getJSON, setJSON } = require('./lib/store');
 const { draftForBooking, calcTotal } = require('./lib/draft');
-const { sendWhatsAppText } = require('./lib/whatsapp');
+const { notifyOwner } = require('./lib/wa-notify-client');
 
 function wixHeaders() {
   return {
@@ -65,8 +66,6 @@ exports.handler = async () => {
   const bookings = await fetchTodaysBookings();
   const invoices = invoicesStore();
   const history = historyStore();
-  const idx = msgIndexStore();
-  const toNumber = process.env.WHATSAPP_TO_NUMBER;
   let drafted = 0;
 
   for (const b of bookings) {
@@ -89,15 +88,16 @@ exports.handler = async () => {
     await setJSON(invoices, rec.id, rec);
     drafted++;
 
-    if (toNumber) {
+    if (process.env.WA_NOTIFY_BASE_URL) {
       const total = calcTotal(rec.lineItems).toFixed(2);
       const text = `New booking: ${rec.patientName} - R${total}\n${draft.note}\n\n`
         + `Reply "approved", "paid R${total} cash/card/eft", or "no charge".`;
-      const waMsgId = await sendWhatsAppText(toNumber, text);
-      if (waMsgId) {
-        await setJSON(idx, waMsgId, rec.id);
-        await setJSON(idx, 'latest', rec.id);
-      }
+      // refId = our own booking/invoice id - wa-notify hands it straight back
+      // on the callback, no separate message-id bookkeeping needed. Note:
+      // wa-notify holds one active reply-conversation per owner phone, so a
+      // second notify() before this one is resolved takes over "the current
+      // reply" - older pending invoices stay safely queued in the app either way.
+      await notifyOwner(text, rec.id);
     }
   }
 

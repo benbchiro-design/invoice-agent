@@ -5,7 +5,6 @@ const { getStore } = require('@netlify/blobs');
 
 const invoicesStore = () => getStore('invoice-agent-invoices'); // bookingId -> invoice record
 const historyStore = () => getStore('invoice-agent-history'); // patientName -> last approved {icd, icd2, lineItems, date}
-const msgIndexStore = () => getStore('invoice-agent-msg-index'); // WhatsApp message id (or "latest") -> bookingId
 
 async function getJSON(store, key, fallback) {
   const raw = await store.get(key);
@@ -16,4 +15,4 @@ async function setJSON(store, key, value) {
   await store.set(key, JSON.stringify(value));
 }
 
-module.exports = { invoicesStore, historyStore, msgIndexStore, getJSON, setJSON };
+module.exports = { invoicesStore, historyStore, getJSON, setJSON };
