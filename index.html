@@ -621,7 +621,7 @@ function aiSuggest(id){
   fetch(getClaudeApi(),{
     method:'POST',headers:{'Content-Type':'application/json','x-api-key':ANTHROPIC_KEY,'anthropic-version':'2023-06-01'},
     body:JSON.stringify({
-      model:'claude-sonnet-4-6',max_tokens:600,
+      model:'claude-sonnet-5',max_tokens:600,
       system:'South African chiropractic billing. Return ONLY a JSON array [{code,description,qty,rate}] using NHRPL codes, rates in ZAR. Codes: 04301 Consultation R300, 04311 Single diagnostic R108.10, 04312 Two diagnostic R162.10, 04313 Three diagnostic R216.20, 04331 Single treatment R43.20, 04332 Two treatment R64.80, 04333 Three treatment R86.50, 04334 Four treatment R108.10. ICD-10: '+icd+'. No other text.',
       messages:[{role:'user',content:'Current: '+JSON.stringify(getLineItems(id))+'\nInstruction: '+prompt}]
     })
@@ -1076,7 +1076,7 @@ function sendChat(){
   chatHistory.push({role:'user',content:text});
   var today=new Date().toISOString().split('T')[0];
   fetch(getClaudeApi(),{method:'POST',headers:{'Content-Type':'application/json','x-api-key':ANTHROPIC_KEY,'anthropic-version':'2023-06-01'},
-    body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:400,
+    body:JSON.stringify({model:'claude-sonnet-5',max_tokens:400,
       system:'Data planning assistant for a chiropractic practice. Given a user question output ONLY a JSON object: {"from":"ISO date","to":"ISO date","type":"bookings"|"invoices"|"both","question":"original"}. Today is '+today+'. "last week" = Mon-Sun of last week. "this month" = current month. "this week" = current week. No other text.',
       messages:[{role:'user',content:text}]})
   }).then(function(r){return r.json();}).then(function(planData){
@@ -1103,7 +1103,7 @@ function sendChat(){
     }
     return fetchData.then(function(rawData){
       return fetch(getClaudeApi(),{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:600,
+        body:JSON.stringify({model:'claude-sonnet-5',max_tokens:600,
           system:'Assistant for Ben Bradford Chiropractic. Answer questions about bookings and invoices concisely using plain text or simple HTML tables. Currency is ZAR (R). Be direct and specific.',
           messages:chatHistory.concat([{role:'user',content:'Question: '+text+'\n\nData ('+plan.from.split('T')[0]+' to '+plan.to.split('T')[0]+'):\n'+JSON.stringify(rawData,null,2)}])})
       }).then(function(r){return r.json();});
