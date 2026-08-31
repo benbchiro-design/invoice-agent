@@ -68,6 +68,7 @@ h1{font-size:20px;font-weight:600}
 .info-eft{background:var(--purple-bg);color:var(--purple-text)}
 .info-nocharge{background:var(--gray-bg);color:var(--gray-text)}
 .info-paid{background:var(--green-bg);color:var(--green-text)}
+.info-draft{background:var(--gray-bg);color:var(--gray-text);font-style:italic}
 .section-label{font-size:12px;font-weight:500;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
 .line-items{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px;table-layout:fixed}
 .line-items th{text-align:left;font-weight:500;color:var(--text-secondary);padding:5px 6px;border-bottom:0.5px solid var(--border);font-size:12px}
@@ -235,6 +236,7 @@ var CLAUDE_API = 'https://api.anthropic.com/v1/messages';
 
 function getClaudeApi(){ return CLAUDE_API; }
 var records = [];
+var PATIENT_HISTORY = {}; // patientName -> {icd, icd2, lineItems, date} from their last approved invoice
 
 var fmtZar = function(n){ return 'R' + Number(n||0).toLocaleString('en-ZA',{minimumFractionDigits:2,maximumFractionDigits:2}); };
 var fmtDate = function(iso){ return iso ? new Date(iso).toLocaleString('en-ZA',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '-'; };
@@ -304,6 +306,11 @@ function bodyHtml(rec){
   return doneHtml(rec);
 }
 
+function draftNoteHtml(rec){
+  if(!rec.draftNote) return '';
+  return '<div class="info-box info-draft">'+rec.draftNote+'</div>';
+}
+
 // LINE ITEMS SUMMARY (shown after payment selection in check-in)
 function lineItemsSummary(rec){
   var rows = rec.lineItems.map(function(i){
@@ -327,7 +334,8 @@ function lineItemsSummary(rec){
 
 // CHECK-IN
 function checkinHtml(rec){
-  return '<div class="checkin-q">Has '+rec.patientName.split(' ')[0]+' paid?</div>'
+  return draftNoteHtml(rec)
+    +'<div class="checkin-q">Has '+rec.patientName.split(' ')[0]+' paid?</div>'
     +'<div class="pay-opts">'
     +'<div class="pay-opt" id="opt-paid-'+rec.id+'" onclick="pickPayment(\''+rec.id+'\',\'paid\')">Yes - paid now</div>'
     +'<div class="pay-opt" id="opt-eft-'+rec.id+'" onclick="pickPayment(\''+rec.id+'\',\'eft\')">Will EFT later</div>'
@@ -405,7 +413,8 @@ function doNoCharge(id){
 // APPROVAL
 function approvalHtml(rec){
   var isEft = rec.paymentChoice==='eft';
-  return '<div class="info-box '+(isEft?'info-eft':'info-paid')+'" style="margin-bottom:14px">'
+  return draftNoteHtml(rec)
+    +'<div class="info-box '+(isEft?'info-eft':'info-paid')+'" style="margin-bottom:14px">'
     +(isEft ? 'Unpaid invoice - will request EFT from '+rec.patientEmail : 'Paid via '+(rec.paymentMethod||'-')+' - receipt to '+rec.patientEmail)
     +'</div>'
     +'<div style="margin-bottom:12px">'
@@ -416,7 +425,7 @@ function approvalHtml(rec){
     +'<div class="icd-dropdown" id="iddp-'+rec.id+'" style="display:none"></div></div></div>'
     +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
     +'<span style="font-size:13px;color:var(--text-secondary);min-width:110px">Secondary ICD-10</span>'
-    +'<div class="icd-wrap"><input class="icd-input" type="text" id="icd2-'+rec.id+'" value="" placeholder="Optional - add for 04334+" autocomplete="off"'
+    +'<div class="icd-wrap"><input class="icd-input" type="text" id="icd2-'+rec.id+'" value="'+(rec.icd2||'')+'" placeholder="Optional - add for 04334+" autocomplete="off"'
     +' oninput="filterIcd(\''+rec.id+'\',this.value,\'s\')" onfocus="filterIcd(\''+rec.id+'\',this.value,\'s\')" onblur="setTimeout(function(){hideIcdDd(\'idds-'+rec.id+'\')},180)">'
     +'<div class="icd-dropdown" id="idds-'+rec.id+'" style="display:none"></div></div></div>'
     +'<div class="icd-warning" id="icd-warn-'+rec.id+'">Codes 04334-04336 require a distinct secondary ICD-10 code per Discovery Health rule 004.</div>'
@@ -610,7 +619,7 @@ function aiSuggest(id){
   btn.disabled=true; btn.textContent='Thinking...';
   var icd = (document.getElementById('icd-'+id)||{}).value||defaultIcd();
   fetch(getClaudeApi(),{
-    method:'POST',headers:{'Content-Type':'application/json'},
+    method:'POST',headers:{'Content-Type':'application/json','x-api-key':ANTHROPIC_KEY,'anthropic-version':'2023-06-01'},
     body:JSON.stringify({
       model:'claude-sonnet-4-6',max_tokens:600,
       system:'South African chiropractic billing. Return ONLY a JSON array [{code,description,qty,rate}] using NHRPL codes, rates in ZAR. Codes: 04301 Consultation R300, 04311 Single diagnostic R108.10, 04312 Two diagnostic R162.10, 04313 Three diagnostic R216.20, 04331 Single treatment R43.20, 04332 Two treatment R64.80, 04333 Three treatment R86.50, 04334 Four treatment R108.10. ICD-10: '+icd+'. No other text.',
@@ -667,7 +676,13 @@ function approveAndSend(id){
 
   // Mark record as sent
   rec.stage = isEft ? 'eft' : 'done';
-  rec.icd=icd; rec.lineItems=lineItems;
+  rec.icd=icd; rec.icd2=icd2; rec.lineItems=lineItems;
+
+  // Remember what was actually approved so the agent's next draft for this
+  // patient starts from a real visit instead of the generic default.
+  PATIENT_HISTORY[rec.patientName] = {icd:icd, icd2:icd2, lineItems:lineItems, date:new Date().toISOString()};
+  saveHistory();
+
   setTimeout(function(){ fade(id, renderAll); }, 500);
 }
 
@@ -865,6 +880,27 @@ function defaultItems(appointmentTime){
   ];
 }
 
+// AGENT DRAFT — pre-fills ICD-10 + line items before a human ever opens the record.
+// Never picks a payment status and never sends anything; it only prepares what
+// lands in the approval queue for a person to check and approve.
+function draftForBooking(patientName, appointmentTime){
+  var hist = PATIENT_HISTORY[patientName];
+  if(hist){
+    return {
+      icd: hist.icd || defaultIcd(),
+      icd2: hist.icd2 || '',
+      lineItems: hist.lineItems.map(function(i){ return Object.assign({},i); }),
+      note: 'Agent draft: reused '+(hist.icd||defaultIcd())+' and line items from '+patientName.split(' ')[0]+"'s last visit ("+fmtDate(hist.date)+'). Check before approving.'
+    };
+  }
+  return {
+    icd: defaultIcd(),
+    icd2: '',
+    lineItems: defaultItems(appointmentTime),
+    note: 'Agent draft: no visit history for '+patientName.split(' ')[0]+' - used the default consultation template. Check codes before approving.'
+  };
+}
+
 // LOAD
 function loadAll(){
   var btn=document.getElementById('refresh-btn');
@@ -878,11 +914,13 @@ function loadAll(){
   queryWixBookings()
   .then(function(data){
     records=(data.pending||[]).map(function(inv){
+      var draft = draftForBooking(inv.patientName, inv.appointmentTime);
       return {id:inv.invoiceId,invoiceId:inv.invoiceId,invoiceNumber:inv.invoiceNumber,
         patientName:inv.patientName,patientEmail:inv.patientEmail,
         appointmentTime:inv.appointmentTime,stage:'checkin',
-        paymentChoice:null,paymentMethod:null,icd:defaultIcd(),
-        lineItems:inv.lineItems&&inv.lineItems.length?inv.lineItems:defaultItems(inv.appointmentTime)};
+        paymentChoice:null,paymentMethod:null,
+        icd:draft.icd,icd2:draft.icd2,draftNote:draft.note,
+        lineItems:inv.lineItems&&inv.lineItems.length?inv.lineItems:draft.lineItems};
     });
     renderAll();
   }).catch(function(){
@@ -982,13 +1020,14 @@ function queryWixBookingsByDate(from,to){
 function demoData(){
   var ago=function(mins){return new Date(Date.now()-mins*60000).toISOString();};
   var tonight=new Date(); tonight.setHours(19,30,0,0);
+  var noHist=function(n){return 'Agent draft: no visit history for '+n+' - used the default consultation template. Check codes before approving.';};
   return [
-    {id:'demo-1',invoiceId:'demo-1',invoiceNumber:'INV-0051',patientName:'Sarah Johnson',patientEmail:'sarah@example.com',appointmentTime:ago(30),stage:'checkin',paymentChoice:null,paymentMethod:null,icd:'M99.11',lineItems:defaultItems(ago(30))},
-    {id:'demo-2',invoiceId:'demo-2',invoiceNumber:'INV-0052',patientName:'Michael van der Berg',patientEmail:'mvdb@example.com',appointmentTime:tonight.toISOString(),stage:'checkin',paymentChoice:null,paymentMethod:null,icd:'M54.5',lineItems:defaultItems(tonight.toISOString())},
-    {id:'demo-3',invoiceId:'demo-3',invoiceNumber:'INV-0053',patientName:'Priya Naidoo',patientEmail:'priya@example.com',appointmentTime:ago(90),stage:'checkin',paymentChoice:null,paymentMethod:null,icd:'K07.62',lineItems:[{code:'04301',description:'Consultation',qty:1,rate:300},{code:'04312',description:'Two Diagnostic Procedures',qty:1,rate:250},{code:'04332',description:'Two Treatment Procedures',qty:1,rate:180}]},
-    {id:'demo-4',invoiceId:'demo-4',invoiceNumber:'INV-0054',patientName:'James Petersen',patientEmail:'james@example.com',appointmentTime:ago(120),stage:'checkin',paymentChoice:null,paymentMethod:null,icd:'M54.4',lineItems:[{code:'04301',description:'Consultation',qty:1,rate:300},{code:'04313',description:'Three Diagnostic Procedures',qty:1,rate:216.20},{code:'04333',description:'Three Treatment Procedures',qty:1,rate:180}]},
-    {id:'demo-5',invoiceId:'demo-5',invoiceNumber:'INV-0055',patientName:'Amahle Dlamini',patientEmail:'amahle@example.com',appointmentTime:ago(45),stage:'checkin',paymentChoice:null,paymentMethod:null,icd:'M54.12',lineItems:[{code:'04301',description:'Consultation',qty:1,rate:300},{code:'04312',description:'Two Diagnostic Procedures',qty:1,rate:250},{code:'04334',description:'Four Treatment Procedures',qty:1,rate:108.10}]},
-    {id:'demo-6',invoiceId:'demo-6',invoiceNumber:'INV-0048',patientName:'Tariq Adams',patientEmail:'tariq@example.com',appointmentTime:ago(300),stage:'eft',paymentChoice:'eft',paymentMethod:null,icd:'M75.1',lineItems:[{code:'04301',description:'Consultation',qty:1,rate:300},{code:'04312',description:'Two Diagnostic Procedures',qty:1,rate:250},{code:'04333',description:'Three Treatment Procedures',qty:1,rate:180}]}
+    {id:'demo-1',invoiceId:'demo-1',invoiceNumber:'INV-0051',patientName:'Sarah Johnson',patientEmail:'sarah@example.com',appointmentTime:ago(30),stage:'checkin',paymentChoice:null,paymentMethod:null,icd:'M99.11',icd2:'',draftNote:noHist('Sarah'),lineItems:defaultItems(ago(30))},
+    {id:'demo-2',invoiceId:'demo-2',invoiceNumber:'INV-0052',patientName:'Michael van der Berg',patientEmail:'mvdb@example.com',appointmentTime:tonight.toISOString(),stage:'checkin',paymentChoice:null,paymentMethod:null,icd:'M54.5',icd2:'',draftNote:noHist('Michael'),lineItems:defaultItems(tonight.toISOString())},
+    {id:'demo-3',invoiceId:'demo-3',invoiceNumber:'INV-0053',patientName:'Priya Naidoo',patientEmail:'priya@example.com',appointmentTime:ago(90),stage:'checkin',paymentChoice:null,paymentMethod:null,icd:'K07.62',icd2:'',draftNote:'Agent draft: reused K07.62 and line items from Priya\'s last visit (12 Aug). Check before approving.',lineItems:[{code:'04301',description:'Consultation',qty:1,rate:300},{code:'04312',description:'Two Diagnostic Procedures',qty:1,rate:250},{code:'04332',description:'Two Treatment Procedures',qty:1,rate:180}]},
+    {id:'demo-4',invoiceId:'demo-4',invoiceNumber:'INV-0054',patientName:'James Petersen',patientEmail:'james@example.com',appointmentTime:ago(120),stage:'checkin',paymentChoice:null,paymentMethod:null,icd:'M54.4',icd2:'',draftNote:noHist('James'),lineItems:[{code:'04301',description:'Consultation',qty:1,rate:300},{code:'04313',description:'Three Diagnostic Procedures',qty:1,rate:216.20},{code:'04333',description:'Three Treatment Procedures',qty:1,rate:180}]},
+    {id:'demo-5',invoiceId:'demo-5',invoiceNumber:'INV-0055',patientName:'Amahle Dlamini',patientEmail:'amahle@example.com',appointmentTime:ago(45),stage:'checkin',paymentChoice:null,paymentMethod:null,icd:'M54.12',icd2:'',draftNote:noHist('Amahle'),lineItems:[{code:'04301',description:'Consultation',qty:1,rate:300},{code:'04312',description:'Two Diagnostic Procedures',qty:1,rate:250},{code:'04334',description:'Four Treatment Procedures',qty:1,rate:108.10}]},
+    {id:'demo-6',invoiceId:'demo-6',invoiceNumber:'INV-0048',patientName:'Tariq Adams',patientEmail:'tariq@example.com',appointmentTime:ago(300),stage:'eft',paymentChoice:'eft',paymentMethod:null,icd:'M75.1',icd2:'',draftNote:noHist('Tariq'),lineItems:[{code:'04301',description:'Consultation',qty:1,rate:300},{code:'04312',description:'Two Diagnostic Procedures',qty:1,rate:250},{code:'04333',description:'Three Treatment Procedures',qty:1,rate:180}]}
   ];
 }
 
@@ -1088,6 +1127,17 @@ function sendChat(){
   }).finally(function(){ sendBtn.disabled=false; if(input) input.focus(); });
 }
 
+function saveHistory(){
+  try{ localStorage.setItem('bbc_history', JSON.stringify(PATIENT_HISTORY)); }catch(e){}
+}
+
+function loadHistory(){
+  try{
+    var raw = localStorage.getItem('bbc_history');
+    if(raw) PATIENT_HISTORY = JSON.parse(raw);
+  }catch(e){}
+}
+
 function saveConfig(){
   try{
     localStorage.setItem('bbc_icd',   document.getElementById('default-icd').value||'');
@@ -1113,6 +1163,7 @@ function loadConfig(){
 document.addEventListener('DOMContentLoaded',function(){
   document.getElementById('date-label').textContent=new Date().toLocaleDateString('en-ZA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   loadConfig();
+  loadHistory();
   var ci=document.getElementById('chat-input');
   if(ci) ci.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();}});
   loadAll();
