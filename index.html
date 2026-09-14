@@ -628,12 +628,7 @@ function aiSuggest(id){
 }
 
 // APPROVE & SEND
-function approveAndSend(id){
-  var rec = records.find(function(r){return r.id===id;});
-  if(!rec) return;
-  var lineItems = getLineItems(id)||rec.lineItems;
-  var icd  = (document.getElementById('icd-' +id)||{}).value||defaultIcd();
-  var icd2 = (document.getElementById('icd2-'+id)||{}).value||'';
+function buildInvoiceMailto(rec, lineItems, icd, icd2){
   var isEft = rec.paymentChoice==='eft';
   var total = lineItems.reduce(function(s,i){return s+(parseFloat(i.qty||1)*parseFloat(i.rate||0));},0);
 
@@ -663,7 +658,18 @@ function approveAndSend(id){
       +'%0D%0A%0D%0ATOTAL PAID: R'+total.toFixed(2)+' ('+( rec.paymentMethod||'')+')'
       +'%0D%0A%0D%0A'+footer;
 
-  window.location.href = 'mailto:'+encodeURIComponent(rec.patientEmail)+'?subject='+subject+'&body='+bodyText;
+  return 'mailto:'+encodeURIComponent(rec.patientEmail)+'?subject='+subject+'&body='+bodyText;
+}
+
+function approveAndSend(id){
+  var rec = records.find(function(r){return r.id===id;});
+  if(!rec) return;
+  var lineItems = getLineItems(id)||rec.lineItems;
+  var icd  = (document.getElementById('icd-' +id)||{}).value||defaultIcd();
+  var icd2 = (document.getElementById('icd2-'+id)||{}).value||'';
+  var isEft = rec.paymentChoice==='eft';
+
+  window.location.href = buildInvoiceMailto(rec, lineItems, icd, icd2);
 
   // Mark record as sent
   rec.stage = isEft ? 'eft' : 'done';
@@ -776,7 +782,12 @@ function markEftPaid(id){
   fade(id, renderAll);
 }
 
-function resendEft(id){ showMsg(id,'Invoice resent','ok'); }
+function resendEft(id){
+  var rec = records.find(function(r){return r.id===id;});
+  if(!rec) return;
+  window.location.href = buildInvoiceMailto(rec, rec.lineItems, rec.icd||defaultIcd(), rec.icd2||'');
+  showMsg(id,'Invoice resent','ok');
+}
 
 // DONE TAB
 function doneHtml(rec){
