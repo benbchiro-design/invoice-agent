@@ -613,7 +613,7 @@ function aiSuggest(id){
     method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
       model:'claude-sonnet-4-6',max_tokens:600,
-      system:'South African chiropractic billing. Return ONLY a JSON array [{code,description,qty,rate}] using NHRPL codes, rates in ZAR. Codes: 04301 Consultation R300, 04311 Single diagnostic R108.10, 04312 Two diagnostic R162.10, 04313 Three diagnostic R216.20, 04331 Single treatment R43.20, 04332 Two treatment R64.80, 04333 Three treatment R86.50, 04334 Four treatment R108.10. ICD-10: '+icd+'. No other text.',
+      system:'South African chiropractic billing. Return ONLY a JSON array [{code,description,qty,rate}] using NHRPL codes, rates in ZAR. Codes: 04301 Consultation R360, 04311 Single diagnostic R108.10, 04312 Two diagnostic R162.10, 04313 Three diagnostic R216.20, 04331 Single treatment R43.20, 04332 Two treatment R64.80, 04333 Three treatment R86.50, 04334 Four treatment R108.10. ICD-10: '+icd+'. No other text.',
       messages:[{role:'user',content:'Current: '+JSON.stringify(getLineItems(id))+'\nInstruction: '+prompt}]
     })
   }).then(function(r){return r.json();}).then(function(data){
@@ -827,7 +827,7 @@ function openLookup(cb){
 function closeLookup(){ document.getElementById('lookup-overlay')&&document.getElementById('lookup-overlay').remove(); lookupCallback=null; }
 
 var RPL_CODES = [
-  {section:'Consultations',code:'04301',description:'Consultation',rate:300},
+  {section:'Consultations',code:'04301',description:'Consultation',rate:360},
   {section:'Diagnostic procedures',code:'04311',description:'Single diagnostic procedure',rate:108.10},
   {section:'Diagnostic procedures',code:'04312',description:'Two diagnostic procedures',rate:162.10},
   {section:'Diagnostic procedures',code:'04313',description:'Three diagnostic procedures',rate:216.20},
@@ -870,7 +870,7 @@ function selectCode(code, description, rate){
 function defaultItems(appointmentTime){
   var isAfterHours = appointmentTime ? new Date(appointmentTime).getHours()>=19 : false;
   return [
-    {code:'04301',description:'Consultation'+(isAfterHours?' (after hours)':''),qty:1,rate:isAfterHours?420:300},
+    {code:'04301',description:'Consultation'+(isAfterHours?' (after hours)':''),qty:1,rate:isAfterHours?480:360},
     {code:'04312',description:'Two Diagnostic Procedures',qty:1,rate:250},
     {code:'04333',description:'Three Treatment Procedures',qty:1,rate:180}
   ];
